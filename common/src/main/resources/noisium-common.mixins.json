@@ -9,7 +9,10 @@
     "ChunkSectionMixin",
     "GenerationShapeConfigMixin",
     "NoiseChunkGeneratorMixin",
-    "compat.lithium.LithiumNoiseChunkGeneratorMixin"
+    "compat.lithium.LithiumNoiseChunkGeneratorMixin",
+    "NoiseChunkGeneratorMixin",
+    "ServerWorldMixin",
+    "world.WorldMixin"
   ],
   "client": [
   ],
