@@ -8,6 +8,7 @@
     "ChainedBlockSourceMixin",
     "ChunkSectionMixin",
     "GenerationShapeConfigMixin",
+    "server.MinecraftServerMixin",
     "NoiseChunkGeneratorMixin",
     "compat.lithium.LithiumNoiseChunkGeneratorMixin",
     "NoiseChunkGeneratorMixin",
