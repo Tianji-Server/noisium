@@ -12,11 +12,14 @@
     "NoiseChunkGeneratorMixin",
     "compat.lithium.LithiumNoiseChunkGeneratorMixin",
     "NoiseChunkGeneratorMixin",
+    "server.MinecraftServerMixin",
     "server.world.ServerChunkManagerMixin",
     "server.world.ServerWorldMixin",
+    "server.world.ThreadedAnvilChunkStorageMixin",
     "world.WorldMixin"
   ],
   "client": [
+    "client.gui.hud.DebugHudMixin"
   ],
   "injectors": {
     "defaultRequire": 1
