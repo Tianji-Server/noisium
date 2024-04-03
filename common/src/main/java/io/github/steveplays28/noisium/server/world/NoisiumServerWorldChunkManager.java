@@ -3,23 +3,28 @@ package io.github.steveplays28.noisium.server.world;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.mojang.datafixers.DataFixer;
 import io.github.steveplays28.noisium.Noisium;
+import io.github.steveplays28.noisium.mixin.accessor.NoiseChunkGeneratorAccessor;
 import io.github.steveplays28.noisium.server.world.chunk.ServerChunkData;
 import io.github.steveplays28.noisium.util.world.chunk.ChunkUtil;
 import net.minecraft.entity.EntityType;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.server.world.ServerLightingProvider;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.BlockView;
+import net.minecraft.world.ChunkRegion;
 import net.minecraft.world.ChunkSerializer;
 import net.minecraft.world.LightType;
-import net.minecraft.world.chunk.ChunkProvider;
-import net.minecraft.world.chunk.ProtoChunk;
-import net.minecraft.world.chunk.UpgradeData;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.chunk.*;
 import net.minecraft.world.chunk.light.LightSourceView;
+import net.minecraft.world.gen.chunk.Blender;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
+import net.minecraft.world.gen.chunk.ChunkGeneratorSettings;
+import net.minecraft.world.gen.chunk.NoiseChunkGenerator;
+import net.minecraft.world.gen.noise.NoiseConfig;
 import net.minecraft.world.poi.PointOfInterestStorage;
 import net.minecraft.world.storage.VersionedChunkStorage;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -27,9 +32,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
-import java.util.BitSet;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -39,6 +42,7 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 	private final ChunkGenerator chunkGenerator;
 	private final PointOfInterestStorage pointOfInterestStorage;
 	private final VersionedChunkStorage versionedChunkStorage;
+	private final NoiseConfig noiseConfig;
 	private final Executor threadPoolExecutor;
 	private final Map<ChunkPos, ServerChunkData> loadedWorldChunks;
 
@@ -52,6 +56,18 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 		this.threadPoolExecutor = Executors.newFixedThreadPool(
 				1, new ThreadFactoryBuilder().setNameFormat("Noisium Server World Chunk Manager %d").build());
 		this.loadedWorldChunks = new HashMap<>();
+
+		if (chunkGenerator instanceof NoiseChunkGenerator noiseChunkGenerator) {
+			this.noiseConfig = NoiseConfig.create(
+					noiseChunkGenerator.getSettings().value(),
+					serverWorld.getRegistryManager().getWrapperOrThrow(RegistryKeys.NOISE_PARAMETERS), serverWorld.getSeed()
+			);
+		} else {
+			this.noiseConfig = NoiseConfig.create(
+					ChunkGeneratorSettings.createMissingSettings(),
+					serverWorld.getRegistryManager().getWrapperOrThrow(RegistryKeys.NOISE_PARAMETERS), serverWorld.getSeed()
+			);
+		}
 	}
 
 	@Override
@@ -104,7 +120,7 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 			var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 			if (fetchedNbtData == null) {
 				// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
-				return null;
+				return new WorldChunk(serverWorld, generateChunk(chunkPos), null);
 			}
 
 			var fetchedChunk = ChunkSerializer.deserialize(serverWorld, pointOfInterestStorage, chunkPos, fetchedNbtData);
@@ -136,11 +152,7 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 		var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 		if (fetchedNbtData == null) {
 			// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
-			var protoChunk = new ProtoChunk(
-					chunkPos, UpgradeData.NO_UPGRADE_DATA, serverWorld, serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null);
-			return new WorldChunk(serverWorld, protoChunk,
-					chunkToAddEntitiesTo -> serverWorld.addEntities(EntityType.streamFromNbt(protoChunk.getEntities(), serverWorld))
-			);
+			return new WorldChunk(serverWorld, generateChunk(chunkPos), null);
 		}
 
 		var fetchedChunk = ChunkSerializer.deserialize(serverWorld, pointOfInterestStorage, chunkPos, fetchedNbtData);
@@ -206,5 +218,46 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 		}
 
 		return null;
+	}
+
+	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos) {
+		var serverLightingProvider = (ServerLightingProvider) serverWorld.getLightingProvider();
+
+		// TODO: Fix Minecraft so it can generate 1 chunk at a time
+		var radius = 17;
+		List<Chunk> chunkRegionChunks = new ArrayList<>();
+		for (int chunkPosX = chunkPos.x - radius; chunkPosX < chunkPos.x + radius; chunkPosX++) {
+			for (int chunkPosZ = chunkPos.z - radius; chunkPosZ < chunkPos.z + radius; chunkPosZ++) {
+				var chunkPosThatShouldBeLoaded = new ChunkPos(chunkPosX, chunkPosZ);
+				var protoChunk = new ProtoChunk(chunkPosThatShouldBeLoaded, UpgradeData.NO_UPGRADE_DATA, serverWorld,
+						serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null
+				);
+				protoChunk.setLightingProvider(serverLightingProvider);
+				protoChunk.setStatus(ChunkStatus.FULL);
+				chunkRegionChunks.add(protoChunk);
+			}
+		}
+
+		var protoChunk = new ProtoChunk(chunkPos, UpgradeData.NO_UPGRADE_DATA, serverWorld,
+				serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null
+		);
+		var chunkRegion = new ChunkRegion(serverWorld, chunkRegionChunks, ChunkStatus.FULL, 0);
+		var blender = Blender.getBlender(chunkRegion);
+		var structureAccessor = serverWorld.getStructureAccessor();
+
+		protoChunk.setStatus(ChunkStatus.BIOMES);
+		protoChunk.populateBiomes(chunkGenerator.getBiomeSource(), noiseConfig.getMultiNoiseSampler());
+
+		protoChunk.setStatus(ChunkStatus.NOISE);
+		var generationShapeConfig = ((NoiseChunkGenerator) chunkGenerator).getSettings().value().generationShapeConfig().trimHeight(
+				protoChunk.getHeightLimitView());
+		int minimumY = generationShapeConfig.minimumY();
+		int minimumCellY = MathHelper.floorDiv(minimumY, generationShapeConfig.verticalCellBlockCount());
+		int cellHeight = MathHelper.floorDiv(generationShapeConfig.height(), generationShapeConfig.verticalCellBlockCount());
+		((NoiseChunkGeneratorAccessor) chunkGenerator).invokePopulateNoise(
+				blender, structureAccessor, noiseConfig, protoChunk, minimumCellY, cellHeight);
+
+		protoChunk.setStatus(ChunkStatus.FULL);
+		return protoChunk;
 	}
 }

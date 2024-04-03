@@ -48,7 +48,7 @@ public class NoisiumServerPlayerChunkLoader {
 			var player = players.get(i);
 			var playerBlockPos = player.getBlockPos();
 			if (!playerBlockPos.isWithinDistance(previousPlayerPositions.get(player.getId()), 16d)) {
-				var worldChunks = worldChunksSupplier.apply(new ChunkPos(playerBlockPos), 14);
+				var worldChunks = worldChunksSupplier.apply(new ChunkPos(playerBlockPos), 2);
 
 				ChunkUtil.sendWorldChunksToPlayerAsync(serverWorld, new ArrayList<>(worldChunks.values()));
 				CompletableFuture.runAsync(() -> player.networkHandler.sendPacket(

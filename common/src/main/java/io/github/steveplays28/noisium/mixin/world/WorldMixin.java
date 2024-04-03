@@ -22,7 +22,7 @@ public abstract class WorldMixin {
 			return;
 		}
 
-		cir.setReturnValue(
-				((NoisiumServerWorldExtension) this).noisium$getServerWorldChunkManager().getChunk(new ChunkPos(chunkX, chunkZ)));
+		((NoisiumServerWorldExtension) this).noisium$getServerWorldChunkManager().getChunkAsync(new ChunkPos(chunkX, chunkZ)).whenComplete(
+				(worldChunk, throwable) -> cir.setReturnValue(worldChunk));
 	}
 }

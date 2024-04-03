@@ -12,6 +12,7 @@
     "NoiseChunkGeneratorMixin",
     "compat.lithium.LithiumNoiseChunkGeneratorMixin",
     "NoiseChunkGeneratorMixin",
+    "accessor.NoiseChunkGeneratorAccessor",
     "server.MinecraftServerMixin",
     "server.world.ServerChunkManagerMixin",
     "server.world.ServerWorldMixin",

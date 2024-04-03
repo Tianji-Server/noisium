@@ -17,6 +17,10 @@ subprojects {
     dependencies {
         minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
         mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+
+        include(implementation("io.github.notstirred:dasm:${rootProject.dasm_version}") {
+            transitive = false
+        })
     }
 }
 

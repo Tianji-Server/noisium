@@ -34,7 +34,7 @@ public abstract class DebugHudMixin {
 			return;
 		}
 
-		cir.setReturnValue(((NoisiumServerWorldExtension) serverWorld).noisium$getServerWorldChunkManager().getChunk(
-				new ChunkPos(playerPosition.x, playerPosition.z)));
+		((NoisiumServerWorldExtension) serverWorld).noisium$getServerWorldChunkManager().getChunkAsync(
+				new ChunkPos(playerPosition.x, playerPosition.z)).whenComplete((worldChunk, throwable) -> cir.setReturnValue(worldChunk));
 	}
 }

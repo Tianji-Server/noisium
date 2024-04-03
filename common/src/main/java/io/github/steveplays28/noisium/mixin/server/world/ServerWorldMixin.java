@@ -34,7 +34,7 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 	@Inject(method = "<init>", at = @At(value = "TAIL"))
 	private void noisium$constructorCreateServerWorldChunkManager(MinecraftServer server, Executor workerExecutor, LevelStorage.Session session, ServerWorldProperties properties, RegistryKey<World> worldKey, DimensionOptions dimensionOptions, WorldGenerationProgressListener worldGenerationProgressListener, boolean debugWorld, long seed, List<?> spawners, boolean shouldTickTime, RandomSequencesState randomSequencesState, CallbackInfo ci, @Local DataFixer dataFixer) {
 		this.noisium$serverWorldChunkManager = new NoisiumServerWorldChunkManager(
-				toServerWorld(), dimensionOptions.chunkGenerator(), session.getWorldDirectory(worldKey), dataFixer);
+				this.toServerWorld(), dimensionOptions.chunkGenerator(), session.getWorldDirectory(worldKey), dataFixer);
 	}
 
 	@Override

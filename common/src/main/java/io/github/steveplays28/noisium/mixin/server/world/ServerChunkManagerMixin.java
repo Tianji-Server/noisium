@@ -32,6 +32,7 @@ public abstract class ServerChunkManagerMixin {
 
 	@Inject(method = "getWorldChunk", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$getWorldChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<WorldChunk> cir) {
-		cir.setReturnValue(((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().getChunk(new ChunkPos(chunkX, chunkZ)));
+		((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().getChunkAsync(
+				new ChunkPos(chunkX, chunkZ)).whenComplete((worldChunk, throwable) -> cir.setReturnValue(worldChunk));
 	}
 }
