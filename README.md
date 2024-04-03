@@ -33,6 +33,7 @@ This includes (but is not limited to) C2ME, Lithium, Nvidium, and Sodium.
 
 - C2ME: every world generation thread runs faster. The biome population multithreading is also done in a much better/more performant way in C2ME, so it's been removed from Noisium since `v1.0.2`. It's suggested to run C2ME alongside Noisium for even better world generation performance.
 - Distant Horizons: Noisium speeds up LOD world generation threads, since LOD generation depends on Minecraft's world generation speed.
+- ReTerraForged: RTF has built-in compatibility with Noisium, to fully utilize the optimisations during RTF world generation.
 
 ### Incompatibilities
 
