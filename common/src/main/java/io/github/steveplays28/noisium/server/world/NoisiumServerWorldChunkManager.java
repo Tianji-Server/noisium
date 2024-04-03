@@ -14,12 +14,10 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.BlockView;
-import net.minecraft.world.ChunkRegion;
-import net.minecraft.world.ChunkSerializer;
-import net.minecraft.world.LightType;
+import net.minecraft.world.*;
 import net.minecraft.world.chunk.*;
 import net.minecraft.world.chunk.light.LightSourceView;
+import net.minecraft.world.gen.GenerationStep;
 import net.minecraft.world.gen.chunk.Blender;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
 import net.minecraft.world.gen.chunk.ChunkGeneratorSettings;
@@ -152,7 +150,9 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 		var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 		if (fetchedNbtData == null) {
 			// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
-			return new WorldChunk(serverWorld, generateChunk(chunkPos), null);
+			var fetchedWorldChunk = new WorldChunk(serverWorld, generateChunk(chunkPos), null);
+			loadedWorldChunks.put(chunkPos, new ServerChunkData(fetchedWorldChunk, (short) 0, new BitSet(), new BitSet()));
+			return fetchedWorldChunk;
 		}
 
 		var fetchedChunk = ChunkSerializer.deserialize(serverWorld, pointOfInterestStorage, chunkPos, fetchedNbtData);
@@ -243,7 +243,7 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 		);
 		var chunkRegion = new ChunkRegion(serverWorld, chunkRegionChunks, ChunkStatus.FULL, 0);
 		var blender = Blender.getBlender(chunkRegion);
-		var structureAccessor = serverWorld.getStructureAccessor();
+		var regionStructureAccessor = serverWorld.getStructureAccessor().forRegion(chunkRegion);
 
 		protoChunk.setStatus(ChunkStatus.BIOMES);
 		protoChunk.populateBiomes(chunkGenerator.getBiomeSource(), noiseConfig.getMultiNoiseSampler());
@@ -255,9 +255,28 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 		int minimumCellY = MathHelper.floorDiv(minimumY, generationShapeConfig.verticalCellBlockCount());
 		int cellHeight = MathHelper.floorDiv(generationShapeConfig.height(), generationShapeConfig.verticalCellBlockCount());
 		((NoiseChunkGeneratorAccessor) chunkGenerator).invokePopulateNoise(
-				blender, structureAccessor, noiseConfig, protoChunk, minimumCellY, cellHeight);
+				blender, regionStructureAccessor, noiseConfig, protoChunk, minimumCellY, cellHeight);
+
+		protoChunk.setStatus(ChunkStatus.SURFACE);
+		chunkGenerator.buildSurface(chunkRegion, regionStructureAccessor, noiseConfig, protoChunk);
+
+		protoChunk.setStatus(ChunkStatus.CARVERS);
+		chunkGenerator.carve(
+				chunkRegion, serverWorld.getSeed(), noiseConfig, chunkRegion.getBiomeAccess(), regionStructureAccessor, protoChunk,
+				GenerationStep.Carver.AIR
+		);
+
+		protoChunk.setStatus(ChunkStatus.FEATURES);
+		Heightmap.populateHeightmaps(
+				protoChunk, EnumSet.of(Heightmap.Type.MOTION_BLOCKING, Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, Heightmap.Type.OCEAN_FLOOR,
+						Heightmap.Type.WORLD_SURFACE
+				)
+		);
+		chunkGenerator.generateFeatures(chunkRegion, protoChunk, regionStructureAccessor);
+		Blender.tickLeavesAndFluids(chunkRegion, protoChunk);
 
 		protoChunk.setStatus(ChunkStatus.FULL);
+		versionedChunkStorage.setNbt(chunkPos, ChunkSerializer.serialize(serverWorld, protoChunk));
 		return protoChunk;
 	}
 }

@@ -17,6 +17,7 @@
     "server.world.ServerChunkManagerMixin",
     "server.world.ServerWorldMixin",
     "server.world.ThreadedAnvilChunkStorageMixin",
+    "world.WorldAccessMixin",
     "world.WorldMixin"
   ],
   "client": [
