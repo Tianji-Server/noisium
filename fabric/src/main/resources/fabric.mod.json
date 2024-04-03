@@ -27,7 +27,7 @@
         "forge",
         "neoforge"
       ],
-      "curseforge": "${curseforge_project_id}",
+      "curseforge": 930207,
       "modrinth": "${modrinth_project_id}"
     }
   },

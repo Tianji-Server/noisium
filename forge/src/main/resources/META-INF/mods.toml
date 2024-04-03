@@ -16,7 +16,7 @@ displayURL = "https://github.com/Steveplays28/${mod_id}"
 
 [mc-publish]
 loaders = ["fabric", "quilt", "forge", "neoforge"]
-curseforge = "${curseforge_project_id}"
+curseforge = 930207
 modrinth = "${modrinth_project_id}"
 
 [[dependencies.noisium]]
