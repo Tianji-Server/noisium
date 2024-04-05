@@ -20,13 +20,6 @@ curseforge = "${curseforge_project_id}"
 modrinth = "${modrinth_project_id}"
 
 [[dependencies.noisium]]
-modId = "forge"
-mandatory = true
-versionRange = ">=${neoforge_version}"
-ordering = "NONE"
-side = "BOTH"
-
-[[dependencies.noisium]]
 modId = "minecraft"
 mandatory = true
 versionRange = "${supported_minecraft_version}"
