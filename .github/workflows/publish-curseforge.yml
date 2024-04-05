@@ -1,4 +1,4 @@
-name: Publish
+name: Publish (CurseForge)
 
 on:
   workflow_dispatch:
@@ -55,12 +55,6 @@ jobs:
       - name: Publish mod
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          # GitHub releases
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-          # Modrinth
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-
           # CurseForge
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
 
@@ -72,8 +66,3 @@ jobs:
           version-type: release
           modrinth-featured: false
           changelog-file: CHANGELOG_LATEST.md
-
-      - name: Publish mod to Maven repository
-        run: ./gradlew publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

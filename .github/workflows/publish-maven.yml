@@ -1,4 +1,4 @@
-name: Publish
+name: Publish (Maven)
 
 on:
   workflow_dispatch:
@@ -50,28 +50,6 @@ jobs:
 
       - name: Execute Gradle build
         run: ./gradlew build
-
-      # https://github.com/marketplace/actions/mc-publish
-      - name: Publish mod
-        uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          # GitHub releases
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-          # Modrinth
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-
-          # CurseForge
-          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-
-          name: ${{ steps.mod_version.outputs.value }} (${{ steps.supported_minecraft_version.outputs.value }})
-          github-tag: v${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version.outputs.value }}
-          files: |
-            build/libs/!(*-@(sources|dev-shadow|javadoc)).jar
-            **/build/libs/*-@(sources|dev-shadow|javadoc).jar
-          version-type: release
-          modrinth-featured: false
-          changelog-file: CHANGELOG_LATEST.md
 
       - name: Publish mod to Maven repository
         run: ./gradlew publish
