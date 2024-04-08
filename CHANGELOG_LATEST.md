@@ -1,4 +1,9 @@
+### Added
+
+- Lithium compatibility
+  - You no longer have to sacrifice fish for performance
+
 ### Fixed
 
-- NeoForge support
-    - Removed the dependency on (Neo)Forge, so the merged JAR can work for both NeoForge and Forge
+- NeoForge 1.20.2+ support
+  - Removed the JiJ Mixin Extras, because NeoForge already includes it
