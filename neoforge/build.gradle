@@ -5,26 +5,19 @@ plugins {
     id "com.github.johnrengelman.shadow" version "${shadow_plugin_version}"
 }
 
-def archivesNameForge = "${rootProject.archives_base_name}-forge"
+def archivesNameNeoForge = "${rootProject.archives_base_name}-neoforge"
 
 architectury {
     platformSetupLoomIde()
-    forge()
+    neoForge()
 }
 
 base {
-    archivesName = archivesNameForge
+    archivesName = archivesNameNeoForge
 }
 
 loom {
     accessWidenerPath = project(":common").loom.accessWidenerPath
-
-    forge {
-        convertAccessWideners = true
-        extraAccessWideners.add loom.accessWidenerPath.get().asFile.name
-
-        mixinConfig "${mod_id}-common.mixins.json"
-    }
 }
 
 configurations {
@@ -32,21 +25,21 @@ configurations {
     shadowCommon // Don't use shadow from the shadow plugin since it *excludes* files.
     compileClasspath.extendsFrom common
     runtimeClasspath.extendsFrom common
-    developmentForge.extendsFrom common
+    developmentNeoForge.extendsFrom common
 }
 
 dependencies {
-    forge "net.minecraftforge:forge:${rootProject.minecraft_version}-${rootProject.forge_version}"
+    neoForge "net.neoforged:neoforge:${rootProject.neoforge_version}"
 
     // Mixin Extras
-    include(implementation(annotationProcessor("io.github.llamalad7:mixinextras-forge:${project.mixin_extras_version}")))
+    implementation(annotationProcessor("io.github.llamalad7:mixinextras-forge:${project.mixin_extras_version}"))
 
     common(project(path: ":common", configuration: "namedElements")) { transitive false }
-    shadowCommon(project(path: ":common", configuration: "transformProductionForge")) { transitive = false }
+    shadowCommon(project(path: ":common", configuration: "transformProductionNeoForge")) { transitive = false }
 }
 
 processResources {
-    inputs.property "version", "${project.version}-forge"
+    inputs.property "version", "${project.version}-neoforge"
 
     filesMatching("META-INF/mods.toml") {
         expand "version": project.version,
@@ -73,6 +66,8 @@ shadowJar {
 remapJar {
     inputFile.set shadowJar.archiveFile
     dependsOn shadowJar
+
+    atAccessWideners.add(loom.accessWidenerPath.get().asFile.name)
 }
 
 sourcesJar {
@@ -91,7 +86,7 @@ publishing {
     publications {
         mavenJava(MavenPublication) {
             groupId = rootProject.maven_group
-            artifactId = archivesNameForge
+            artifactId = archivesNameNeoForge
             from components.java
         }
     }
