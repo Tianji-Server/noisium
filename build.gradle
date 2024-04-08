@@ -56,26 +56,17 @@ allprojects {
     java {
         withSourcesJar()
     }
-}
 
-jar {
-    from("LICENSE") {
-        rename { "${it}_${project.archivesBaseName}" }
-    }
-}
-
-// Delete the root build/ directory
-// This directory contains temporary files after building which are unnecessary and confusing to keep around
-tasks.register("deleteRootBuildDirectory") {
-    doLast {
-        delete "build/"
+    jar {
+        from(rootProject.file("LICENSE")) {
+            rename { "${it}_${rootProject.mod_namespace}" }
+        }
     }
 }
 
 // Clean the previous build output of the root project and all subprojects before building
 tasks.named("build") {
     dependsOn(clean, subprojects.clean)
-    finalizedBy(deleteRootBuildDirectory)
 }
 
 publishing {
