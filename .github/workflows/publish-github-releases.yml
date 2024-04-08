@@ -51,18 +51,8 @@ jobs:
       - name: Execute Gradle build
         run: ./gradlew build
 
-      # https://github.com/marketplace/actions/mc-publish
-      - name: Publish mod
-        uses: Kir-Antipov/mc-publish@v3.3
+      - name: Publish mod to GitHub releases
+        uses: ncipollo/release-action@v1.14.0
         with:
-          # GitHub releases
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-          name: ${{ steps.mod_version.outputs.value }} (${{ steps.supported_minecraft_version.outputs.value }})
-          github-tag: v${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version.outputs.value }}
-          files: |
-            build/libs/!(*-@(sources|dev-shadow|javadoc)).jar
-            **/build/libs/*-@(sources|dev-shadow|javadoc).jar
-          version-type: release
-          modrinth-featured: false
-          changelog-file: CHANGELOG_LATEST.md
+          artifacts: "**/build/libs/!(*-@(dev-shadow|transformProduction*).jar)"
+          bodyFile: CHANGELOG_LATEST.md

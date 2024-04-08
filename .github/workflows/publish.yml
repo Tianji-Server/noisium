@@ -64,7 +64,7 @@ jobs:
           name: ${{ steps.mod_version.outputs.value }} (${{ steps.supported_minecraft_version.outputs.value }})
           github-tag: v${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version.outputs.value }}
           files: |
-            fabric/build/libs/!(*-@(sources|dev-shadow|javadoc|transformProduction*)).jar
+            fabric/build/libs/!(*-@(sources|dev-shadow|javadoc|transformProduction*).jar)
             fabric/build/libs/*-@(sources|javadoc).jar
           version-type: release
           modrinth-featured: false
@@ -83,7 +83,7 @@ jobs:
           name: ${{ steps.mod_version.outputs.value }} (${{ steps.supported_minecraft_version.outputs.value }})
           github-tag: v${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version.outputs.value }}
           files: |
-            forge/build/libs/!(*-@(sources|dev-shadow|javadoc|transformProduction*)).jar
+            forge/build/libs/!(*-@(sources|dev-shadow|javadoc|transformProduction*).jar)
             forge/build/libs/*-@(sources|javadoc).jar
           version-type: release
           modrinth-featured: false
@@ -102,7 +102,7 @@ jobs:
           name: ${{ steps.mod_version.outputs.value }} (${{ steps.supported_minecraft_version.outputs.value }})
           github-tag: v${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version.outputs.value }}
           files: |
-            neoforge/build/libs/!(*-@(sources|dev-shadow|javadoc|transformProduction*)).jar
+            neoforge/build/libs/!(*-@(sources|dev-shadow|javadoc|transformProduction*).jar)
             neoforge/build/libs/*-@(sources|javadoc).jar
           version-type: release
           modrinth-featured: false
@@ -111,7 +111,7 @@ jobs:
       - name: Publish mod to GitHub releases
         uses: ncipollo/release-action@v1.14.0
         with:
-          artifacts: "**/build/libs/!(*-@(dev-shadow|transformProduction*)).jar"
+          artifacts: "**/build/libs/!(*-@(dev-shadow|transformProduction*).jar)"
           bodyFile: CHANGELOG_LATEST.md
 
       - name: Publish mod to Maven repository
