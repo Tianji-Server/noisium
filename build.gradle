@@ -64,45 +64,6 @@ jar {
     }
 }
 
-// Forgix settings
-// Forgix merges all modloader specific JARs into one JAR
-forgix {
-    group = "${rootProject.maven_group}.${rootProject.archives_base_name}"
-    mergedJarName = "${rootProject.mod_id}-merged-${rootProject.version}.jar"
-    outputDir = "build/libs/"
-}
-
-// Move the merged JAR into the build/libs/ folder, overwriting any near-empty JARs previously there
-// Afterwards, delete the Merged/ folder
-tasks.register("cleanRootBuildDirectory") {
-    doLast {
-        delete "build/"
-        mkdir "build/libs/"
-    }
-}
-
-// Register a task that runs Forgix' mergeJars task and then the moveMergedJar task after all subprojects have been built
-tasks.register("mergeJarsAfterSubprojectsBuild") {
-    dependsOn(subprojects.build)
-    finalizedBy(mergeJars)
-}
-
-// Run the cleanRootBuildDirectory task before merging JARs using Forgix, to make sure GitHub Actions doesn't upload any unused build results and to prevent confusion
-tasks.named("mergeJars") {
-    dependsOn(cleanRootBuildDirectory)
-}
-
-// Run the clean task before building, to make sure Forgix doesn't use any JARs it shouldn't use
-tasks.named("build") {
-    dependsOn(clean, subprojects.clean)
-    finalizedBy(mergeJarsAfterSubprojectsBuild)
-}
-
-tasks.named("assemble") {
-    dependsOn(clean, subprojects.clean)
-    finalizedBy(mergeJarsAfterSubprojectsBuild)
-}
-
 publishing {
     publications {
         mavenJava(MavenPublication) {
