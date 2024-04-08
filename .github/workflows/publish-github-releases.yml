@@ -30,7 +30,21 @@ jobs:
           property: supported_minecraft_version
           default: 0.0.1
 
-      - run: echo version string ${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version.outputs.value }}
+      - name: Print version string
+        run: echo version string ${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version.outputs.value }}
+
+      - name: Get existing release
+        uses: cardinalby/git-get-release-action@v1
+        id: get_existing_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag: v${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version.outputs.value }}
+          doNotFailIfNotFound: true
+
+      - name: Check if an existing release with the same version exists
+        if: steps.get_existing_release.outputs.tag_name == v${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version.outputs.value }}
+        run: exit 1
 
       - name: Setup JDK (Temurin 17)
         uses: actions/setup-java@v3
