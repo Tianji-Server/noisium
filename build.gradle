@@ -64,6 +64,20 @@ jar {
     }
 }
 
+// Delete the root build/ directory
+// This directory contains temporary files after building which are unnecessary and confusing to keep around
+tasks.register("deleteRootBuildDirectory") {
+    doLast {
+        delete "build/"
+    }
+}
+
+// Clean the previous build output of the root project and all subprojects before building
+tasks.named("build") {
+    dependsOn(clean, subprojects.clean)
+    finalizedBy(deleteRootBuildDirectory)
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
