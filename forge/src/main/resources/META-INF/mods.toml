@@ -19,9 +19,23 @@ loaders = ["fabric", "quilt", "forge", "neoforge"]
 curseforge = "${curseforge_project_id}"
 modrinth = "${modrinth_project_id}"
 
-[[dependencies.noisium]]
+[[dependencies.${mod_id}]]
 modId = "minecraft"
 mandatory = true
 versionRange = "${supported_minecraft_version}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.${mod_id}]]
+modId = "forge"
+mandatory = true
+versionRange = ">=${forge_version}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.${mod_id}]]
+modId = "architectury"
+mandatory = true
+versionRange = ">=${architectury_api_version}"
 ordering = "NONE"
 side = "BOTH"
