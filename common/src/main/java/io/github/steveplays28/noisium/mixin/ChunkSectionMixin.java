@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.Unique;
 @Mixin(ChunkSection.class)
 public class ChunkSectionMixin {
 	@Unique
-	private static final int sliceSize = 4;
+	private static final int noisium$sliceSize = 4;
 
 	@Shadow
 	private ReadableContainer<RegistryEntry<Biome>> biomeContainer;
@@ -28,9 +28,9 @@ public class ChunkSectionMixin {
 	public void populateBiomes(BiomeSupplier biomeSupplier, MultiNoiseUtil.MultiNoiseSampler sampler, int x, int y, int z) {
 		PalettedContainer<RegistryEntry<Biome>> palettedContainer = this.biomeContainer.slice();
 
-		for (int posX = 0; posX < sliceSize; ++posX) {
-			for (int posZ = 0; posZ < sliceSize; ++posZ) {
-				for (int posY = 0; posY < sliceSize; ++posY) {
+		for (int posY = 0; posY < noisium$sliceSize; ++posY) {
+			for (int posZ = 0; posZ < noisium$sliceSize; ++posZ) {
+				for (int posX = 0; posX < noisium$sliceSize; ++posX) {
 					palettedContainer.swapUnsafe(posX, posY, posZ, biomeSupplier.getBiome(x + posX, y + posY, z + posZ, sampler));
 				}
 			}
