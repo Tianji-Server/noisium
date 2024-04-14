@@ -1,5 +1,5 @@
 modLoader = "javafml"
-loaderVersion = ">=${neoforge_version}"
+loaderVersion = ">=${forge_version}"
 license = "${mod_license}"
 issueTrackerURL = "https://github.com/Steveplays28/${mod_id}/issues"
 
@@ -15,7 +15,6 @@ logoFile = "assets/${mod_namespace}/icon.png"
 displayURL = "https://github.com/Steveplays28/${mod_id}"
 
 [mc-publish]
-loaders = ["fabric", "quilt", "forge", "neoforge"]
 curseforge = "${curseforge_project_id}"
 modrinth = "${modrinth_project_id}"
 
@@ -30,12 +29,5 @@ side = "BOTH"
 modId = "forge"
 mandatory = true
 versionRange = ">=${neoforge_version}"
-ordering = "NONE"
-side = "BOTH"
-
-[[dependencies.${mod_id}]]
-modId = "architectury"
-mandatory = true
-versionRange = ">=${architectury_api_version}"
 ordering = "NONE"
 side = "BOTH"

@@ -23,9 +23,7 @@
     "mc-publish": {
       "loaders": [
         "fabric",
-        "quilt",
-        "forge",
-        "neoforge"
+        "quilt"
       ],
       "curseforge": "${curseforge_project_id}",
       "modrinth": "${modrinth_project_id}"
@@ -42,8 +40,7 @@
   ],
   "depends": {
     "fabricloader": ">=${fabric_loader_version}",
-    "minecraft": "${supported_minecraft_version}",
-    "architectury": ">=${architectury_api_version}"
+    "minecraft": "${supported_minecraft_version}"
   },
   "suggests": {
     "c2me": "*"
