@@ -43,7 +43,7 @@ jobs:
           doNotFailIfNotFound: true
 
       - name: Check if an existing release with the same version exists
-        if: ${{ steps.get_existing_release.outputs.tag_name }} == v${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version_name.outputs.value }}
+        if: steps.get_existing_release.outputs.tag_name == 'v'steps.mod_version.outputs.value'+mc'steps.supported_minecraft_version_name.outputs.value
         run: exit 1
 
       - name: Setup JDK (Temurin 17)
