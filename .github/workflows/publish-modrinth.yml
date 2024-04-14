@@ -33,6 +33,9 @@ jobs:
       - name: Print version string
         run: echo version string ${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version_name.outputs.value }}
 
+      - name: Set release tag name environment variable
+        run: echo release_tag_name=v${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version_name.outputs.value }} >> $GITHUB_ENV
+
       - name: Get existing release
         uses: cardinalby/git-get-release-action@v1
         id: get_existing_release
@@ -43,7 +46,7 @@ jobs:
           doNotFailIfNotFound: true
 
       - name: Check if an existing release with the same version exists
-        if: steps.get_existing_release.outputs.tag_name == 'v'steps.mod_version.outputs.value'+mc'steps.supported_minecraft_version_name.outputs.value
+        if: steps.get_existing_release.outputs.tag_name == env.release_tag_name
         run: exit 1
 
       - name: Setup JDK (Temurin 17)
@@ -73,7 +76,7 @@ jobs:
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
 
           name: ${{ steps.mod_version.outputs.value }} (${{ steps.supported_minecraft_version_name.outputs.value }})
-          github-tag: v${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version_name.outputs.value }}
+          github-tag: ${{ env.release_tag_name }}
           files: |
             fabric/build/libs/!(*-@(sources|dev-shadow|javadoc|transformProduction*).jar)
             fabric/build/libs/*-@(sources|javadoc).jar
@@ -89,7 +92,7 @@ jobs:
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
 
           name: ${{ steps.mod_version.outputs.value }} (${{ steps.supported_minecraft_version_name.outputs.value }})
-          github-tag: v${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version_name.outputs.value }}
+          github-tag: ${{ env.release_tag_name }}
           files: |
             forge/build/libs/!(*-@(sources|dev-shadow|javadoc|transformProduction*).jar)
             forge/build/libs/*-@(sources|javadoc).jar
@@ -105,7 +108,7 @@ jobs:
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
 
           name: ${{ steps.mod_version.outputs.value }} (${{ steps.supported_minecraft_version_name.outputs.value }})
-          github-tag: v${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version_name.outputs.value }}
+          github-tag: ${{ env.release_tag_name }}
           files: |
             neoforge/build/libs/!(*-@(sources|dev-shadow|javadoc|transformProduction*).jar)
             neoforge/build/libs/*-@(sources|javadoc).jar
