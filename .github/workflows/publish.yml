@@ -109,6 +109,7 @@ jobs:
       - name: Publish mod to GitHub releases
         uses: ncipollo/release-action@v1.14.0
         with:
+          name: ${{ steps.mod_version.outputs.value }} (${{ steps.supported_minecraft_version_name.outputs.value }})
           tag: ${{ env.release_tag_name }}
           artifacts: "**/build/libs/!(*-@(dev-shadow|transformProduction*).jar)"
           bodyFile: CHANGELOG_LATEST.md
