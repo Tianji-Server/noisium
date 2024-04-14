@@ -24,14 +24,14 @@ jobs:
 
       - name: Get supported Minecraft version from Gradle
         uses: madhead/read-java-properties@latest
-        id: supported_minecraft_version
+        id: supported_minecraft_version_name
         with:
           file: gradle.properties
-          property: supported_minecraft_version
+          property: supported_minecraft_version_name
           default: 0.0.1
 
       - name: Print version string
-        run: echo version string ${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version.outputs.value }}
+        run: echo version string ${{ steps.mod_version.outputs.value }}+mc${{ steps.supported_minecraft_version_name.outputs.value }}
 
       - name: Get existing release
         uses: cardinalby/git-get-release-action@v1
