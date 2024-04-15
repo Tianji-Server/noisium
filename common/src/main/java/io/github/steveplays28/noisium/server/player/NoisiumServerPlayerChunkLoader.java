@@ -16,9 +16,12 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.function.BiFunction;
 
+// TODO: Dynamically enable/disable instances of this class if the world this class is tied to gets loaded/unloaded
 public class NoisiumServerPlayerChunkLoader {
 	private final Map<Integer, Vec3d> previousPlayerPositions;
 	private final Executor threadPoolExecutor;
