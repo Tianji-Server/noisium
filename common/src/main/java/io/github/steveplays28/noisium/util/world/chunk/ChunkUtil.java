@@ -1,9 +1,12 @@
 package io.github.steveplays28.noisium.util.world.chunk;
 
+import net.minecraft.block.BlockState;
+import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
 import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
 import net.minecraft.network.packet.s2c.play.LightUpdateS2CPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.chunk.light.LightingProvider;
@@ -71,6 +74,20 @@ public class ChunkUtil {
 	public static void sendLightUpdateToPlayers(@NotNull List<ServerPlayerEntity> players, LightingProvider lightingProvider, ChunkPos chunkPos, BitSet skyLightBits, BitSet blockLightBits) {
 		for (int i = 0; i < players.size(); i++) {
 			players.get(i).networkHandler.sendPacket(new LightUpdateS2CPacket(chunkPos, lightingProvider, skyLightBits, blockLightBits));
+		}
+	}
+
+	/**
+	 * Sends a block update to a {@link List} of players.
+	 *
+	 * @param players    The {@link List} of players.
+	 * @param blockPos   The {@link BlockPos} of the block update that should be sent to the {@link List} of players.
+	 * @param blockState The {@link BlockState} at the specified {@link BlockPos} of the block update that should be sent to the {@link List} of players.
+	 */
+	@SuppressWarnings("ForLoopReplaceableByForEach")
+	public static void sendBlockUpdateToPlayers(@NotNull List<ServerPlayerEntity> players, @NotNull BlockPos blockPos, BlockState blockState) {
+		for (int i = 0; i < players.size(); i++) {
+			players.get(i).networkHandler.sendPacket(new BlockUpdateS2CPacket(blockPos, blockState));
 		}
 	}
 }

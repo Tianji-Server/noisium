@@ -1,6 +1,6 @@
 package io.github.steveplays28.noisium;
 
-import io.github.steveplays28.noisium.server.world.NoisiumServerInitialiser;
+import io.github.steveplays28.noisium.server.NoisiumServerInitialiser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

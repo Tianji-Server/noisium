@@ -1,6 +1,8 @@
 package io.github.steveplays28.noisium.mixin.server.world;
 
 import io.github.steveplays28.noisium.extension.world.server.NoisiumServerWorldExtension;
+import net.minecraft.entity.Entity;
+import net.minecraft.network.packet.Packet;
 import net.minecraft.server.world.ServerChunkManager;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
@@ -34,5 +36,44 @@ public abstract class ServerChunkManagerMixin {
 	private void noisium$getWorldChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<WorldChunk> cir) {
 		((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().getChunkAsync(
 				new ChunkPos(chunkX, chunkZ)).whenComplete((worldChunk, throwable) -> cir.setReturnValue(worldChunk));
+	}
+
+	// TODO: Don't send this packet to players out of range, to save on bandwidth
+	@SuppressWarnings("ForLoopReplaceableByForEach")
+	@Inject(method = "sendToNearbyPlayers", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$sendToNearbyPlayersViaNoisiumServerWorldChunkManager(Entity entity, Packet<?> packet, CallbackInfo ci) {
+		var server = entity.getServer();
+		if (server == null) {
+			return;
+		}
+
+		var players = server.getPlayerManager().getPlayerList();
+		for (int i = 0; i < players.size(); i++) {
+			players.get(i).networkHandler.sendPacket(packet);
+		}
+
+		ci.cancel();
+	}
+
+	// TODO: Don't send this packet to players out of range, to save on bandwidth
+	@SuppressWarnings("ForLoopReplaceableByForEach")
+	@Inject(method = "sendToOtherNearbyPlayers", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$sendToOtherNearbyPlayersViaNoisiumServerWorldChunkManager(Entity entity, Packet<?> packet, CallbackInfo ci) {
+		var server = entity.getServer();
+		if (server == null) {
+			return;
+		}
+
+		var players = server.getPlayerManager().getPlayerList();
+		for (int i = 0; i < players.size(); i++) {
+			var player = players.get(i);
+			if (player.equals(entity)) {
+				continue;
+			}
+
+			player.networkHandler.sendPacket(packet);
+		}
+
+		ci.cancel();
 	}
 }

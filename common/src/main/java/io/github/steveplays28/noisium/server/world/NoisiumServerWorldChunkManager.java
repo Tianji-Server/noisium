@@ -5,6 +5,7 @@ import com.mojang.datafixers.DataFixer;
 import io.github.steveplays28.noisium.Noisium;
 import io.github.steveplays28.noisium.mixin.accessor.NoiseChunkGeneratorAccessor;
 import io.github.steveplays28.noisium.server.world.chunk.ServerChunkData;
+import io.github.steveplays28.noisium.server.world.chunk.event.NoisiumServerChunkEvent;
 import io.github.steveplays28.noisium.util.world.chunk.ChunkUtil;
 import net.minecraft.entity.EntityType;
 import net.minecraft.nbt.NbtCompound;
@@ -35,6 +36,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+// TODO: Fix canTickBlockEntities() check
+//  The check needs to be changed to point to the server world's isChunkLoaded() method
 public class NoisiumServerWorldChunkManager implements ChunkProvider {
 	private final ServerWorld serverWorld;
 	private final ChunkGenerator chunkGenerator;
@@ -131,7 +134,9 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 			}
 
 			fetchedWorldChunk.addChunkTickSchedulers(serverWorld);
+			fetchedWorldChunk.loadEntities();
 			loadedWorldChunks.put(chunkPos, new ServerChunkData(fetchedWorldChunk, (short) 0, new BitSet(), new BitSet()));
+			NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 		});
 	}
 
@@ -152,6 +157,7 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 			// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
 			var fetchedWorldChunk = new WorldChunk(serverWorld, generateChunk(chunkPos), null);
 			loadedWorldChunks.put(chunkPos, new ServerChunkData(fetchedWorldChunk, (short) 0, new BitSet(), new BitSet()));
+			NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 			return fetchedWorldChunk;
 		}
 
@@ -160,8 +166,10 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 				chunkToAddEntitiesTo -> serverWorld.addEntities(EntityType.streamFromNbt(fetchedChunk.getEntities(), serverWorld))
 		);
 		fetchedWorldChunk.addChunkTickSchedulers(serverWorld);
+		fetchedWorldChunk.loadEntities();
 
 		loadedWorldChunks.put(chunkPos, new ServerChunkData(fetchedWorldChunk, (short) 0, new BitSet(), new BitSet()));
+		NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 		return fetchedWorldChunk;
 	}
 
