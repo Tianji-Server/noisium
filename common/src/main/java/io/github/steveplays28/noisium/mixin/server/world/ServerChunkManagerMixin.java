@@ -1,8 +1,10 @@
 package io.github.steveplays28.noisium.mixin.server.world;
 
 import io.github.steveplays28.noisium.extension.world.server.NoisiumServerWorldExtension;
+import io.github.steveplays28.noisium.server.world.event.NoisiumServerTickEvent;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.Packet;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerChunkManager;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
@@ -29,6 +31,7 @@ public abstract class ServerChunkManagerMixin {
 
 	@Inject(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$stopServerChunkManagerFromTicking(BooleanSupplier shouldKeepTicking, boolean tickChunks, CallbackInfo ci) {
+		NoisiumServerTickEvent.SERVER_ENTITY_MOVEMENT_TICK.invoker().onServerEntityMovementTick();
 		ci.cancel();
 	}
 
@@ -74,6 +77,16 @@ public abstract class ServerChunkManagerMixin {
 			player.networkHandler.sendPacket(packet);
 		}
 
+		ci.cancel();
+	}
+
+	@Inject(method = {"loadEntity", "unloadEntity"}, at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$cancelEntityLoadingAndUnloading(Entity entity, CallbackInfo ci) {
+		ci.cancel();
+	}
+
+	@Inject(method = "updatePosition", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$cancelPlayerPositionUpdating(ServerPlayerEntity player, CallbackInfo ci) {
 		ci.cancel();
 	}
 }

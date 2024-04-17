@@ -2,7 +2,7 @@ package io.github.steveplays28.noisium.server.world.entity;
 
 import dev.architectury.event.EventResult;
 import dev.architectury.event.events.common.EntityEvent;
-import dev.architectury.event.events.common.TickEvent;
+import io.github.steveplays28.noisium.server.world.event.NoisiumServerTickEvent;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.server.network.EntityTrackerEntry;
@@ -24,7 +24,7 @@ public class NoisiumServerWorldEntityTracker {
 		this.packetSendConsumer = packetSendConsumer;
 
 		EntityEvent.ADD.register(this::onEntityAdded);
-		TickEvent.SERVER_LEVEL_PRE.register(this::onTick);
+		NoisiumServerTickEvent.SERVER_ENTITY_MOVEMENT_TICK.register(this::onTick);
 	}
 
 	@SuppressWarnings("ForLoopReplaceableByForEach")
@@ -60,7 +60,7 @@ public class NoisiumServerWorldEntityTracker {
 		return EventResult.pass();
 	}
 
-	private void onTick(ServerWorld serverWorld) {
+	private void onTick() {
 		for (var entityTrackerEntry : entityTrackerEntries.values()) {
 			entityTrackerEntry.tick();
 		}
