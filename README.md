@@ -39,10 +39,8 @@ This includes (but is not limited to) C2ME, Lithium, Nvidium, and Sodium.
 
 ### Incompatibilities
 
-- Lithium: submerged entities (such as fish and squids) occasionally suffocate in water and/or fall to the ground in water. All other
-  features will work fine, just need to occasionally sacrifice a fish for performance.
-
-No other known incompatibilities at this time.
+See the [issue tracker](https://github.com/Steveplays28/noisium/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3Acompatibility) for
+a list of incompatibilities.
 
 ## Download
 
