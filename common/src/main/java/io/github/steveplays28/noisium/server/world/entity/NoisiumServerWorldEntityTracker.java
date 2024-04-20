@@ -47,7 +47,7 @@ public class NoisiumServerWorldEntityTracker {
 			entityTrackerEntries.get(entity.getId()).startTracking(players.get(i));
 		}
 
-		return EventResult.pass();
+		return EventResult.interruptTrue();
 	}
 
 	@SuppressWarnings("ForLoopReplaceableByForEach")

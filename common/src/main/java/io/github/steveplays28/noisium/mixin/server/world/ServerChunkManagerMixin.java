@@ -2,10 +2,14 @@ package io.github.steveplays28.noisium.mixin.server.world;
 
 import io.github.steveplays28.noisium.extension.world.server.NoisiumServerWorldExtension;
 import io.github.steveplays28.noisium.server.world.event.NoisiumServerTickEvent;
+import io.github.steveplays28.noisium.util.world.chunk.networking.packet.PacketUtil;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerChunkManager;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
@@ -87,6 +91,15 @@ public abstract class ServerChunkManagerMixin {
 
 	@Inject(method = "updatePosition", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$cancelPlayerPositionUpdating(ServerPlayerEntity player, CallbackInfo ci) {
+		ci.cancel();
+	}
+
+	@Inject(method = "markForUpdate", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$markForUpdateViaNoisiumServerWorldChunkManager(BlockPos blockPos, CallbackInfo ci) {
+		// TODO: Optimise using a pending update queue and ChunkDeltaUpdateS2CPacket
+		// TODO: Implement block entity update packet sending
+		var serverWorld = (ServerWorld) this.getWorld();
+		PacketUtil.sendPacketToPlayers(serverWorld.getPlayers(), new BlockUpdateS2CPacket(blockPos, serverWorld.getBlockState(blockPos)));
 		ci.cancel();
 	}
 }

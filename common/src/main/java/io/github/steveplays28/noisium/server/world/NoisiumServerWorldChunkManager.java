@@ -38,6 +38,7 @@ import java.util.concurrent.Executors;
 
 // TODO: Fix canTickBlockEntities() check
 //  The check needs to be changed to point to the server world's isChunkLoaded() method
+// TODO: Implement chunk ticking
 public class NoisiumServerWorldChunkManager implements ChunkProvider {
 	private final ServerWorld serverWorld;
 	private final ChunkGenerator chunkGenerator;
