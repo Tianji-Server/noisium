@@ -4,7 +4,6 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.datafixers.DataFixer;
 import dev.architectury.event.events.common.PlayerEvent;
-import dev.architectury.event.events.common.TickEvent;
 import io.github.steveplays28.noisium.extension.world.server.NoisiumServerWorldExtension;
 import io.github.steveplays28.noisium.server.world.NoisiumServerWorldChunkManager;
 import io.github.steveplays28.noisium.server.world.chunk.event.NoisiumServerChunkEvent;
@@ -20,7 +19,6 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.random.RandomSequencesState;
 import net.minecraft.util.profiler.Profiler;
 import net.minecraft.world.World;
-import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.dimension.DimensionOptions;
 import net.minecraft.world.level.ServerWorldProperties;
 import net.minecraft.world.level.storage.LevelStorage;
@@ -44,8 +42,6 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 
 	@Shadow
 	public abstract boolean isChunkLoaded(long chunkPos);
-
-	@Shadow public abstract void tickChunk(WorldChunk chunk, int randomTickSpeed);
 
 	@Unique
 	private NoisiumServerWorldChunkManager noisium$serverWorldChunkManager;
