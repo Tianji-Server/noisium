@@ -19,7 +19,8 @@
     "server.world.ServerWorldMixin",
     "server.world.ThreadedAnvilChunkStorageMixin",
     "world.WorldAccessMixin",
-    "world.WorldMixin"
+    "world.WorldMixin",
+    "world.chunk.WorldChunkMixin"
   ],
   "client": [
     "client.gui.hud.DebugHudMixin"

@@ -1,6 +1,7 @@
 package io.github.steveplays28.noisium.mixin.server.world;
 
 import io.github.steveplays28.noisium.extension.world.server.NoisiumServerWorldExtension;
+import io.github.steveplays28.noisium.server.world.chunk.event.NoisiumServerChunkEvent;
 import io.github.steveplays28.noisium.server.world.event.NoisiumServerTickEvent;
 import io.github.steveplays28.noisium.util.world.chunk.networking.packet.PacketUtil;
 import net.minecraft.entity.Entity;
@@ -11,6 +12,8 @@ import net.minecraft.server.world.ServerChunkManager;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.world.LightType;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
 import org.spongepowered.asm.mixin.Mixin;
@@ -42,7 +45,8 @@ public abstract class ServerChunkManagerMixin {
 	@Inject(method = "getWorldChunk", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$getWorldChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<WorldChunk> cir) {
 		((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().getChunkAsync(
-				new ChunkPos(chunkX, chunkZ)).whenComplete((worldChunk, throwable) -> cir.setReturnValue(worldChunk));
+				new ChunkPos(chunkX, chunkZ)
+		).whenComplete((worldChunk, throwable) -> cir.setReturnValue(worldChunk));
 	}
 
 	// TODO: Don't send this packet to players out of range, to save on bandwidth
@@ -100,6 +104,12 @@ public abstract class ServerChunkManagerMixin {
 		// TODO: Implement block entity update packet sending
 		var serverWorld = (ServerWorld) this.getWorld();
 		PacketUtil.sendPacketToPlayers(serverWorld.getPlayers(), new BlockUpdateS2CPacket(blockPos, serverWorld.getBlockState(blockPos)));
+		ci.cancel();
+	}
+
+	@Inject(method = "onLightUpdate", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$updateLightingViaNoisiumServerWorldChunkManager(LightType lightType, ChunkSectionPos chunkSectionPos, CallbackInfo ci) {
+		NoisiumServerChunkEvent.LIGHT_UPDATE.invoker().onLightUpdate(lightType, chunkSectionPos);
 		ci.cancel();
 	}
 }

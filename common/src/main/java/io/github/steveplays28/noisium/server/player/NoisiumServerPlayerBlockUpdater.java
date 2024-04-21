@@ -16,7 +16,7 @@ public class NoisiumServerPlayerBlockUpdater {
 		BlockEvent.BREAK.register((world, blockPos, blockState, player, xp) -> onBlockBreak(world, blockPos));
 	}
 
-	private EventResult onBlockBreak(@NotNull World world, BlockPos blockPos) {
+	private EventResult onBlockBreak(@NotNull World world, @NotNull BlockPos blockPos) {
 		if (world.isClient()) {
 			return EventResult.pass();
 		}

@@ -3,8 +3,8 @@ package io.github.steveplays28.noisium.server.world;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.mojang.datafixers.DataFixer;
 import io.github.steveplays28.noisium.Noisium;
+import io.github.steveplays28.noisium.extension.world.chunk.NoisiumWorldChunkExtension;
 import io.github.steveplays28.noisium.mixin.accessor.NoiseChunkGeneratorAccessor;
-import io.github.steveplays28.noisium.server.world.chunk.ServerChunkData;
 import io.github.steveplays28.noisium.server.world.chunk.event.NoisiumServerChunkEvent;
 import io.github.steveplays28.noisium.util.world.chunk.ChunkUtil;
 import net.minecraft.entity.EntityType;
@@ -15,9 +15,11 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.*;
+import net.minecraft.world.ChunkRegion;
+import net.minecraft.world.ChunkSerializer;
+import net.minecraft.world.Heightmap;
+import net.minecraft.world.LightType;
 import net.minecraft.world.chunk.*;
-import net.minecraft.world.chunk.light.LightSourceView;
 import net.minecraft.world.gen.GenerationStep;
 import net.minecraft.world.gen.chunk.Blender;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
@@ -39,14 +41,14 @@ import java.util.concurrent.Executors;
 // TODO: Fix canTickBlockEntities() check
 //  The check needs to be changed to point to the server world's isChunkLoaded() method
 // TODO: Implement chunk ticking
-public class NoisiumServerWorldChunkManager implements ChunkProvider {
+public class NoisiumServerWorldChunkManager {
 	private final ServerWorld serverWorld;
 	private final ChunkGenerator chunkGenerator;
 	private final PointOfInterestStorage pointOfInterestStorage;
 	private final VersionedChunkStorage versionedChunkStorage;
 	private final NoiseConfig noiseConfig;
 	private final Executor threadPoolExecutor;
-	private final Map<ChunkPos, ServerChunkData> loadedWorldChunks;
+	private final Map<ChunkPos, WorldChunk> loadedWorldChunks;
 
 	public NoisiumServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull Path worldDirectoryPath, DataFixer dataFixer) {
 		this.serverWorld = serverWorld;
@@ -70,44 +72,13 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 					serverWorld.getRegistryManager().getWrapperOrThrow(RegistryKeys.NOISE_PARAMETERS), serverWorld.getSeed()
 			);
 		}
-	}
 
-	@Override
-	public BlockView getWorld() {
-		return serverWorld;
-	}
-
-	@Nullable
-	@Override
-	public LightSourceView getChunk(int chunkX, int chunkZ) {
-		return getChunk(new ChunkPos(chunkX, chunkZ));
-	}
-
-	@Override
-	public void onLightUpdate(LightType lightType, ChunkSectionPos chunkSectionPosition) {
-		var lightingProvider = serverWorld.getLightingProvider();
-		var chunkPos = chunkSectionPosition.toChunkPos();
-		var chunkSectionYPosition = chunkSectionPosition.getSectionY();
-		int bottomY = lightingProvider.getBottomY();
-		int topY = lightingProvider.getTopY();
-
-		if (chunkSectionYPosition >= bottomY && chunkSectionYPosition <= topY) {
-			int yDifference = chunkSectionYPosition - bottomY;
-			var serverChunkData = loadedWorldChunks.get(chunkPos);
-			var skyLightBits = serverChunkData.skyLightBits();
-			var blockLightBits = serverChunkData.skyLightBits();
-
-			if (lightType == LightType.SKY) {
-				skyLightBits.set(yDifference);
-			} else {
-				blockLightBits.set(yDifference);
-			}
-			ChunkUtil.sendLightUpdateToPlayers(serverWorld.getPlayers(), lightingProvider, chunkPos, skyLightBits, blockLightBits);
-		}
+		NoisiumServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
 	}
 
 	/**
-	 * Loads the chunk at the specified position, returning the loaded chunk when done. Returns the chunk from the <code>loadedChunks</code> cache if available.
+	 * Loads the chunk at the specified position, returning the loaded chunk when done.
+	 * Returns the chunk from the {@link NoisiumServerWorldChunkManager#loadedWorldChunks} cache if available.
 	 * This method is ran asynchronously.
 	 *
 	 * @param chunkPos The position at which to load the chunk.
@@ -115,7 +86,7 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 	 */
 	public @NotNull CompletableFuture<WorldChunk> getChunkAsync(ChunkPos chunkPos) {
 		if (loadedWorldChunks.containsKey(chunkPos)) {
-			return CompletableFuture.completedFuture(loadedWorldChunks.get(chunkPos).worldChunk());
+			return CompletableFuture.completedFuture(loadedWorldChunks.get(chunkPos));
 		}
 
 		return CompletableFuture.supplyAsync(() -> {
@@ -136,28 +107,29 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 
 			fetchedWorldChunk.addChunkTickSchedulers(serverWorld);
 			fetchedWorldChunk.loadEntities();
-			loadedWorldChunks.put(chunkPos, new ServerChunkData(fetchedWorldChunk, (short) 0, new BitSet(), new BitSet()));
+			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 			NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 		});
 	}
 
 	/**
-	 * Loads the chunk at the specified position, returning the loaded chunk when done. Returns the chunk from the <code>loadedChunks</code> cache if available.
-	 * WARNING: This method blocks the server thread. Prefer using {@link NoisiumServerWorldChunkManager#getChunk(int, int)} instead.
+	 * Loads the chunk at the specified position, returning the loaded {@link WorldChunk} when done.
+	 * Returns the chunk from the {@link NoisiumServerWorldChunkManager#loadedWorldChunks} cache if available.
+	 * WARNING: This method blocks the server thread. Prefer using {@link NoisiumServerWorldChunkManager#getChunkAsync} instead.
 	 *
-	 * @param chunkPos The position at which to load the chunk.
-	 * @return The loaded chunk.
+	 * @param chunkPos The position at which to load the {@link WorldChunk}.
+	 * @return The loaded {@link WorldChunk}.
 	 */
-	public @Nullable WorldChunk getChunk(ChunkPos chunkPos) {
+	public @NotNull WorldChunk getChunk(ChunkPos chunkPos) {
 		if (loadedWorldChunks.containsKey(chunkPos)) {
-			return loadedWorldChunks.get(chunkPos).worldChunk();
+			return loadedWorldChunks.get(chunkPos);
 		}
 
 		var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 		if (fetchedNbtData == null) {
 			// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
 			var fetchedWorldChunk = new WorldChunk(serverWorld, generateChunk(chunkPos), null);
-			loadedWorldChunks.put(chunkPos, new ServerChunkData(fetchedWorldChunk, (short) 0, new BitSet(), new BitSet()));
+			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 			NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 			return fetchedWorldChunk;
 		}
@@ -169,7 +141,7 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 		fetchedWorldChunk.addChunkTickSchedulers(serverWorld);
 		fetchedWorldChunk.loadEntities();
 
-		loadedWorldChunks.put(chunkPos, new ServerChunkData(fetchedWorldChunk, (short) 0, new BitSet(), new BitSet()));
+		loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 		NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 		return fetchedWorldChunk;
 	}
@@ -214,6 +186,38 @@ public class NoisiumServerWorldChunkManager implements ChunkProvider {
 		}
 
 		return chunks;
+	}
+
+	/**
+	 * Updates the chunk's lighting at the specified {@link ChunkSectionPos}.
+	 * This method is ran asynchronously.
+	 *
+	 * @param lightType            The {@link LightType} that should be updated for this {@link WorldChunk}.
+	 * @param chunkSectionPosition The {@link ChunkSectionPos} of the {@link WorldChunk}.
+	 */
+	private void onLightUpdateAsync(@NotNull LightType lightType, @NotNull ChunkSectionPos chunkSectionPosition) {
+		CompletableFuture.runAsync(() -> {
+			var lightingProvider = serverWorld.getLightingProvider();
+			int bottomY = lightingProvider.getBottomY();
+			int topY = lightingProvider.getTopY();
+			var chunkSectionYPosition = chunkSectionPosition.getSectionY();
+			if (chunkSectionYPosition < bottomY || chunkSectionYPosition > topY) {
+				return;
+			}
+
+			var chunkPosition = chunkSectionPosition.toChunkPos();
+			var worldChunk = (NoisiumWorldChunkExtension) getChunk(chunkPosition);
+			var skyLightBits = worldChunk.noisium$getBlockLightBits();
+			var blockLightBits = worldChunk.noisium$getSkyLightBits();
+			int chunkSectionYPositionDifference = chunkSectionYPosition - bottomY;
+
+			if (lightType == LightType.SKY) {
+				skyLightBits.set(chunkSectionYPositionDifference);
+			} else {
+				blockLightBits.set(chunkSectionYPositionDifference);
+			}
+			ChunkUtil.sendLightUpdateToPlayers(serverWorld.getPlayers(), lightingProvider, chunkPosition, skyLightBits, blockLightBits);
+		}, threadPoolExecutor);
 	}
 
 	private @Nullable NbtCompound getNbtDataAtChunkPosition(ChunkPos chunkPos) {

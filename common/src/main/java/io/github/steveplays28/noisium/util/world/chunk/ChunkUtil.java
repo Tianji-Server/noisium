@@ -71,7 +71,7 @@ public class ChunkUtil {
 	 * @param blockLightBits   The blocklight {@link BitSet}.
 	 */
 	@SuppressWarnings("ForLoopReplaceableByForEach")
-	public static void sendLightUpdateToPlayers(@NotNull List<ServerPlayerEntity> players, LightingProvider lightingProvider, ChunkPos chunkPos, BitSet skyLightBits, BitSet blockLightBits) {
+	public static void sendLightUpdateToPlayers(@NotNull List<ServerPlayerEntity> players, @NotNull LightingProvider lightingProvider, @NotNull ChunkPos chunkPos, @NotNull BitSet skyLightBits, @NotNull BitSet blockLightBits) {
 		for (int i = 0; i < players.size(); i++) {
 			players.get(i).networkHandler.sendPacket(new LightUpdateS2CPacket(chunkPos, lightingProvider, skyLightBits, blockLightBits));
 		}
@@ -85,7 +85,7 @@ public class ChunkUtil {
 	 * @param blockState The {@link BlockState} at the specified {@link BlockPos} of the block update that should be sent to the {@link List} of players.
 	 */
 	@SuppressWarnings("ForLoopReplaceableByForEach")
-	public static void sendBlockUpdateToPlayers(@NotNull List<ServerPlayerEntity> players, @NotNull BlockPos blockPos, BlockState blockState) {
+	public static void sendBlockUpdateToPlayers(@NotNull List<ServerPlayerEntity> players, @NotNull BlockPos blockPos, @NotNull BlockState blockState) {
 		for (int i = 0; i < players.size(); i++) {
 			players.get(i).networkHandler.sendPacket(new BlockUpdateS2CPacket(blockPos, blockState));
 		}
