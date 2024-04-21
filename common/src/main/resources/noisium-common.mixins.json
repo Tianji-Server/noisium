@@ -15,6 +15,7 @@
     "accessor.NoiseChunkGeneratorAccessor",
     "server.MinecraftServerMixin",
     "server.world.ServerChunkManagerMixin",
+    "server.world.ServerEntityManagerMixin",
     "server.world.ServerWorldMixin",
     "server.world.ThreadedAnvilChunkStorageMixin",
     "world.WorldAccessMixin",
