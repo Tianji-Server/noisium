@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+// TODO: Disable vanilla's ServerEntityManager's save method
 @Mixin(value = ServerEntityManager.class, priority = 500)
 public class ServerEntityManagerMixin<T extends EntityLike> {
 	@Inject(method = "stopTracking", at = @At(value = "HEAD"), cancellable = true)

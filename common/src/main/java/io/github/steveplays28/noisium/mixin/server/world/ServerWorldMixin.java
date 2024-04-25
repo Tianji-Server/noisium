@@ -9,6 +9,7 @@ import io.github.steveplays28.noisium.server.world.NoisiumServerWorldChunkManage
 import io.github.steveplays28.noisium.server.world.chunk.event.NoisiumServerChunkEvent;
 import io.github.steveplays28.noisium.server.world.entity.NoisiumServerWorldEntityTracker;
 import io.github.steveplays28.noisium.util.world.chunk.networking.packet.PacketUtil;
+import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
@@ -16,6 +17,7 @@ import net.minecraft.server.WorldGenerationProgressListener;
 import net.minecraft.server.world.ChunkLevelType;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.RandomSequencesState;
 import net.minecraft.util.profiler.Profiler;
 import net.minecraft.world.World;
@@ -59,7 +61,13 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 
 		// TODO: Redo the server entity manager entirely, in an event-based way
 		//  Also remove this line when that's done, since this doesn't belong here
-		PlayerEvent.PLAYER_JOIN.register(player -> this.entityManager.addEntity(player));
+		PlayerEvent.PLAYER_JOIN.register(player -> {
+			if (!player.getWorld().equals(serverWorld)) {
+				return;
+			}
+
+			this.entityManager.addEntity(player);
+		});
 
 		// TODO: Move this event listener registration to ServerEntityManagerMixin
 		//  or (when it's finished and able to completely replace the vanilla class) to NoisiumServerWorldEntityTracker
@@ -77,6 +85,12 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 	@ModifyExpressionValue(method = "method_31420", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ChunkTicketManager;shouldTickEntities(J)Z"))
 	private boolean noisium$redirectShouldTickEntitiesToEntityManager(boolean original, Profiler profiler, Entity entity) {
 		return this.entityManager.shouldTick(entity.getChunkPos());
+	}
+
+	@Inject(method = "onBlockChanged", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$redirectOnBlockChangedToNoisiumServerWorldChunkManager(BlockPos blockPos, BlockState oldBlockState, BlockState newBlockState, CallbackInfo ci) {
+		NoisiumServerChunkEvent.BLOCK_CHANGE.invoker().onBlockChange(blockPos, oldBlockState, newBlockState);
+		ci.cancel();
 	}
 
 	@Override

@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 // TODO: Reimplement the rest of ServerEntityManager and replace it
+// TODO: Reimplement vanilla's ServerEntityManager's save method
 public class NoisiumServerWorldEntityTracker {
 	private static final @NotNull Logger LOGGER = LoggerFactory.getLogger("Noisium Server World Entity Tracker");
 

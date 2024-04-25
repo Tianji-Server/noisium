@@ -2,16 +2,20 @@ package io.github.steveplays28.noisium.server.world;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.mojang.datafixers.DataFixer;
+import dev.architectury.event.events.common.TickEvent;
 import io.github.steveplays28.noisium.Noisium;
 import io.github.steveplays28.noisium.extension.world.chunk.NoisiumWorldChunkExtension;
 import io.github.steveplays28.noisium.mixin.accessor.NoiseChunkGeneratorAccessor;
 import io.github.steveplays28.noisium.server.world.chunk.event.NoisiumServerChunkEvent;
 import io.github.steveplays28.noisium.util.world.chunk.ChunkUtil;
+import net.minecraft.block.BlockState;
 import net.minecraft.entity.EntityType;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.world.ServerLightingProvider;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.util.math.MathHelper;
@@ -27,6 +31,8 @@ import net.minecraft.world.gen.chunk.ChunkGeneratorSettings;
 import net.minecraft.world.gen.chunk.NoiseChunkGenerator;
 import net.minecraft.world.gen.noise.NoiseConfig;
 import net.minecraft.world.poi.PointOfInterestStorage;
+import net.minecraft.world.poi.PointOfInterestType;
+import net.minecraft.world.poi.PointOfInterestTypes;
 import net.minecraft.world.storage.VersionedChunkStorage;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jetbrains.annotations.NotNull;
@@ -41,6 +47,7 @@ import java.util.concurrent.Executors;
 // TODO: Fix canTickBlockEntities() check
 //  The check needs to be changed to point to the server world's isChunkLoaded() method
 // TODO: Implement chunk ticking
+// TODO: Save all chunks when save event is called
 public class NoisiumServerWorldChunkManager {
 	private final ServerWorld serverWorld;
 	private final ChunkGenerator chunkGenerator;
@@ -74,6 +81,8 @@ public class NoisiumServerWorldChunkManager {
 		}
 
 		NoisiumServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
+		NoisiumServerChunkEvent.BLOCK_CHANGE.register(this::onBlockChange);
+		TickEvent.SERVER_LEVEL_POST.register(instance -> ((ServerLightingProvider) serverWorld.getLightingProvider()).tick());
 	}
 
 	/**
@@ -188,6 +197,10 @@ public class NoisiumServerWorldChunkManager {
 		return chunks;
 	}
 
+	public boolean isChunkLoaded(ChunkPos chunkPos) {
+		return this.loadedWorldChunks.containsKey(chunkPos);
+	}
+
 	/**
 	 * Updates the chunk's lighting at the specified {@link ChunkSectionPos}.
 	 * This method is ran asynchronously.
@@ -196,28 +209,52 @@ public class NoisiumServerWorldChunkManager {
 	 * @param chunkSectionPosition The {@link ChunkSectionPos} of the {@link WorldChunk}.
 	 */
 	private void onLightUpdateAsync(@NotNull LightType lightType, @NotNull ChunkSectionPos chunkSectionPosition) {
-		CompletableFuture.runAsync(() -> {
-			var lightingProvider = serverWorld.getLightingProvider();
-			int bottomY = lightingProvider.getBottomY();
-			int topY = lightingProvider.getTopY();
-			var chunkSectionYPosition = chunkSectionPosition.getSectionY();
-			if (chunkSectionYPosition < bottomY || chunkSectionYPosition > topY) {
-				return;
-			}
+		var lightingProvider = serverWorld.getLightingProvider();
+		int bottomY = lightingProvider.getBottomY();
+		int topY = lightingProvider.getTopY();
+		var chunkSectionYPosition = chunkSectionPosition.getSectionY();
+		if (chunkSectionYPosition < bottomY || chunkSectionYPosition > topY) {
+			return;
+		}
 
-			var chunkPosition = chunkSectionPosition.toChunkPos();
-			var worldChunk = (NoisiumWorldChunkExtension) getChunk(chunkPosition);
-			var skyLightBits = worldChunk.noisium$getBlockLightBits();
-			var blockLightBits = worldChunk.noisium$getSkyLightBits();
+		var chunkPosition = chunkSectionPosition.toChunkPos();
+		getChunkAsync(chunkPosition).whenCompleteAsync((worldChunk, throwable) -> {
+			var worldChunkExtension = (NoisiumWorldChunkExtension) worldChunk;
+			var skyLightBits = worldChunkExtension.noisium$getBlockLightBits();
+			var blockLightBits = worldChunkExtension.noisium$getSkyLightBits();
 			int chunkSectionYPositionDifference = chunkSectionYPosition - bottomY;
 
+			skyLightBits.clear();
+			blockLightBits.clear();
 			if (lightType == LightType.SKY) {
 				skyLightBits.set(chunkSectionYPositionDifference);
 			} else {
 				blockLightBits.set(chunkSectionYPositionDifference);
 			}
 			ChunkUtil.sendLightUpdateToPlayers(serverWorld.getPlayers(), lightingProvider, chunkPosition, skyLightBits, blockLightBits);
-		}, threadPoolExecutor);
+		});
+	}
+
+	// TODO: Check if this can be ran asynchronously
+	@SuppressWarnings("OptionalIsPresent")
+	private void onBlockChange(@NotNull BlockPos blockPos, @NotNull BlockState oldBlockState, @NotNull BlockState newBlockState) {
+		Optional<RegistryEntry<PointOfInterestType>> oldBlockStatePointOfInterestTypeOptional = PointOfInterestTypes.getTypeForState(
+				oldBlockState);
+		Optional<RegistryEntry<PointOfInterestType>> newBlockStatePointOfInterestTypeOptional = PointOfInterestTypes.getTypeForState(
+				newBlockState);
+		if (oldBlockStatePointOfInterestTypeOptional.equals(newBlockStatePointOfInterestTypeOptional)) {
+			return;
+		}
+
+		BlockPos immutableBlockPos = blockPos.toImmutable();
+		if (oldBlockStatePointOfInterestTypeOptional.isPresent()) {
+			pointOfInterestStorage.remove(immutableBlockPos);
+			// TODO: Add sendPoiRemoval method call into DebugInfoSenderMixin using an event
+		}
+		if (newBlockStatePointOfInterestTypeOptional.isPresent()) {
+			pointOfInterestStorage.add(immutableBlockPos, newBlockStatePointOfInterestTypeOptional.get());
+			// TODO: Add sendPoiRemoval method call into DebugInfoSenderMixin using an event
+		}
 	}
 
 	private @Nullable NbtCompound getNbtDataAtChunkPosition(ChunkPos chunkPos) {
@@ -235,58 +272,72 @@ public class NoisiumServerWorldChunkManager {
 
 	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos) {
 		var serverLightingProvider = (ServerLightingProvider) serverWorld.getLightingProvider();
-
-		// TODO: Fix Minecraft so it can generate 1 chunk at a time
-		var radius = 17;
-		List<Chunk> chunkRegionChunks = new ArrayList<>();
-		for (int chunkPosX = chunkPos.x - radius; chunkPosX < chunkPos.x + radius; chunkPosX++) {
-			for (int chunkPosZ = chunkPos.z - radius; chunkPosZ < chunkPos.z + radius; chunkPosZ++) {
-				var chunkPosThatShouldBeLoaded = new ChunkPos(chunkPosX, chunkPosZ);
-				var protoChunk = new ProtoChunk(chunkPosThatShouldBeLoaded, UpgradeData.NO_UPGRADE_DATA, serverWorld,
-						serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null
-				);
-				protoChunk.setLightingProvider(serverLightingProvider);
-				protoChunk.setStatus(ChunkStatus.FULL);
-				chunkRegionChunks.add(protoChunk);
-			}
-		}
-
 		var protoChunk = new ProtoChunk(chunkPos, UpgradeData.NO_UPGRADE_DATA, serverWorld,
 				serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null
 		);
-		var chunkRegion = new ChunkRegion(serverWorld, chunkRegionChunks, ChunkStatus.FULL, 0);
+		// TODO: Fix Minecraft so it can generate 1 chunk at a time
+		List<Chunk> chunkRegionChunks = List.of(protoChunk);
+		var chunkRegion = new ChunkRegion(serverWorld, chunkRegionChunks, ChunkStatus.FULL, 1);
 		var blender = Blender.getBlender(chunkRegion);
-		var regionStructureAccessor = serverWorld.getStructureAccessor().forRegion(chunkRegion);
+		var chunkRegionStructureAccessor = serverWorld.getStructureAccessor().forRegion(chunkRegion);
+
+		protoChunk.setStatus(ChunkStatus.STRUCTURE_STARTS);
+		// TODO: Move the structure placement calculator into NoisiumServerWorldChunkManager
+		// TODO: Pass the structure template manager into NoisiumServerWorldChunkManager
+		// TODO: Pass the shouldGenerateStructures boolean into NoisiumServerWorldChunkManager
+		if (serverWorld.getServer().getSaveProperties().getGeneratorOptions().shouldGenerateStructures()) {
+			chunkGenerator.setStructureStarts(
+					serverWorld.getRegistryManager(), serverWorld.getChunkManager().getStructurePlacementCalculator(),
+					chunkRegionStructureAccessor, protoChunk, serverWorld.getServer().getStructureTemplateManager()
+			);
+		}
+		serverWorld.cacheStructures(protoChunk);
+
+		protoChunk.setStatus(ChunkStatus.STRUCTURE_REFERENCES);
+		chunkGenerator.addStructureReferences(chunkRegion, chunkRegionStructureAccessor, protoChunk);
 
 		protoChunk.setStatus(ChunkStatus.BIOMES);
 		protoChunk.populateBiomes(chunkGenerator.getBiomeSource(), noiseConfig.getMultiNoiseSampler());
 
 		protoChunk.setStatus(ChunkStatus.NOISE);
+		// TODO: Remove the cast to NoiseChunkGenerator
+		//  Or add some other way to support any type of ChunkGenerator
 		var generationShapeConfig = ((NoiseChunkGenerator) chunkGenerator).getSettings().value().generationShapeConfig().trimHeight(
 				protoChunk.getHeightLimitView());
 		int minimumY = generationShapeConfig.minimumY();
 		int minimumCellY = MathHelper.floorDiv(minimumY, generationShapeConfig.verticalCellBlockCount());
 		int cellHeight = MathHelper.floorDiv(generationShapeConfig.height(), generationShapeConfig.verticalCellBlockCount());
+		// TODO: Remove the cast to NoiseChunkGeneratorAccessor
+		//  Or add some other way to support any type of ChunkGenerator
 		((NoiseChunkGeneratorAccessor) chunkGenerator).invokePopulateNoise(
-				blender, regionStructureAccessor, noiseConfig, protoChunk, minimumCellY, cellHeight);
+				blender, chunkRegionStructureAccessor, noiseConfig, protoChunk, minimumCellY, cellHeight);
 
 		protoChunk.setStatus(ChunkStatus.SURFACE);
-		chunkGenerator.buildSurface(chunkRegion, regionStructureAccessor, noiseConfig, protoChunk);
+		chunkGenerator.buildSurface(chunkRegion, chunkRegionStructureAccessor, noiseConfig, protoChunk);
 
 		protoChunk.setStatus(ChunkStatus.CARVERS);
 		chunkGenerator.carve(
-				chunkRegion, serverWorld.getSeed(), noiseConfig, chunkRegion.getBiomeAccess(), regionStructureAccessor, protoChunk,
+				chunkRegion, serverWorld.getSeed(), noiseConfig, chunkRegion.getBiomeAccess(), chunkRegionStructureAccessor, protoChunk,
 				GenerationStep.Carver.AIR
 		);
 
 		protoChunk.setStatus(ChunkStatus.FEATURES);
 		Heightmap.populateHeightmaps(
-				protoChunk, EnumSet.of(Heightmap.Type.MOTION_BLOCKING, Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, Heightmap.Type.OCEAN_FLOOR,
-						Heightmap.Type.WORLD_SURFACE
+				protoChunk,
+				EnumSet.of(
+						Heightmap.Type.MOTION_BLOCKING, Heightmap.Type.MOTION_BLOCKING_NO_LEAVES,
+						Heightmap.Type.OCEAN_FLOOR, Heightmap.Type.WORLD_SURFACE
 				)
 		);
-		chunkGenerator.generateFeatures(chunkRegion, protoChunk, regionStructureAccessor);
+		chunkGenerator.generateFeatures(chunkRegion, protoChunk, chunkRegionStructureAccessor);
 		Blender.tickLeavesAndFluids(chunkRegion, protoChunk);
+
+		protoChunk.setStatus(ChunkStatus.INITIALIZE_LIGHT);
+		protoChunk.refreshSurfaceY();
+		serverLightingProvider.initializeLight(protoChunk, protoChunk.isLightOn());
+
+		protoChunk.setStatus(ChunkStatus.LIGHT);
+		serverLightingProvider.light(protoChunk, protoChunk.isLightOn());
 
 		protoChunk.setStatus(ChunkStatus.FULL);
 		versionedChunkStorage.setNbt(chunkPos, ChunkSerializer.serialize(serverWorld, protoChunk));

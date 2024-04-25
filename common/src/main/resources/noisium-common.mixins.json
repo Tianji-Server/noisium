@@ -18,9 +18,10 @@
     "server.world.ServerEntityManagerMixin",
     "server.world.ServerWorldMixin",
     "server.world.ThreadedAnvilChunkStorageMixin",
-    "world.WorldAccessMixin",
     "world.WorldMixin",
-    "world.chunk.WorldChunkMixin"
+    "world.chunk.WorldChunkMixin",
+    "world.gen.chunk.ChunkGeneratorMixin",
+    "world.gen.chunk.NoiseChunkGeneratorMixin"
   ],
   "client": [
     "client.gui.hud.DebugHudMixin"

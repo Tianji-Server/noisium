@@ -15,6 +15,8 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.LightType;
 import net.minecraft.world.World;
+import net.minecraft.world.chunk.Chunk;
+import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.WorldChunk;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -40,6 +42,14 @@ public abstract class ServerChunkManagerMixin {
 	private void noisium$stopServerChunkManagerFromTicking(BooleanSupplier shouldKeepTicking, boolean tickChunks, CallbackInfo ci) {
 		NoisiumServerTickEvent.SERVER_ENTITY_MOVEMENT_TICK.invoker().onServerEntityMovementTick();
 		ci.cancel();
+	}
+
+	// TODO: Fix infinite loop
+	@Inject(method = "getChunk(IILnet/minecraft/world/chunk/ChunkStatus;Z)Lnet/minecraft/world/chunk/Chunk;", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, ChunkStatus leastStatus, boolean create, CallbackInfoReturnable<Chunk> cir) {
+		((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().getChunkAsync(
+				new ChunkPos(chunkX, chunkZ)
+		).whenComplete((worldChunk, throwable) -> cir.setReturnValue(worldChunk));
 	}
 
 	@Inject(method = "getWorldChunk", at = @At(value = "HEAD"), cancellable = true)
@@ -111,5 +121,16 @@ public abstract class ServerChunkManagerMixin {
 	private void noisium$updateLightingViaNoisiumServerWorldChunkManager(LightType lightType, ChunkSectionPos chunkSectionPos, CallbackInfo ci) {
 		NoisiumServerChunkEvent.LIGHT_UPDATE.invoker().onLightUpdate(lightType, chunkSectionPos);
 		ci.cancel();
+	}
+
+	@Inject(method = "save", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$cancelSave(boolean flush, CallbackInfo ci) {
+		ci.cancel();
+	}
+
+	@Inject(method = "isChunkLoaded", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$isChunkLoadedInNoisiumServerChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<Boolean> cir) {
+		cir.setReturnValue(((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().isChunkLoaded(
+				new ChunkPos(chunkX, chunkZ)));
 	}
 }
