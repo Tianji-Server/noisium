@@ -18,6 +18,7 @@
     "server.world.ServerEntityManagerMixin",
     "server.world.ServerWorldMixin",
     "server.world.ThreadedAnvilChunkStorageMixin",
+    "world.ChunkRegionMixin",
     "world.WorldMixin",
     "world.chunk.WorldChunkMixin",
     "world.gen.chunk.ChunkGeneratorMixin",

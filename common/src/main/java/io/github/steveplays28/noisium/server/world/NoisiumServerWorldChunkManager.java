@@ -82,7 +82,13 @@ public class NoisiumServerWorldChunkManager {
 
 		NoisiumServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
 		NoisiumServerChunkEvent.BLOCK_CHANGE.register(this::onBlockChange);
-		TickEvent.SERVER_LEVEL_POST.register(instance -> ((ServerLightingProvider) serverWorld.getLightingProvider()).tick());
+		TickEvent.SERVER_LEVEL_POST.register(instance -> {
+			if (!instance.equals(serverWorld)) {
+				return;
+			}
+
+			((ServerLightingProvider) serverWorld.getLightingProvider()).tick();
+		});
 	}
 
 	/**
@@ -317,7 +323,7 @@ public class NoisiumServerWorldChunkManager {
 
 		protoChunk.setStatus(ChunkStatus.CARVERS);
 		chunkGenerator.carve(
-				chunkRegion, serverWorld.getSeed(), noiseConfig, chunkRegion.getBiomeAccess(), chunkRegionStructureAccessor, protoChunk,
+				chunkRegion, chunkRegion.getSeed(), noiseConfig, chunkRegion.getBiomeAccess(), chunkRegionStructureAccessor, protoChunk,
 				GenerationStep.Carver.AIR
 		);
 

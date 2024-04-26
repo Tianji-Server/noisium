@@ -51,8 +51,13 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 	private NoisiumServerWorldEntityTracker noisium$serverWorldEntityManager;
 
 	@Inject(method = "<init>", at = @At(value = "TAIL"))
-	private void noisium$constructorCreateServerWorldChunkManager(MinecraftServer server, Executor workerExecutor, LevelStorage.Session session, ServerWorldProperties properties, RegistryKey<World> worldKey, DimensionOptions dimensionOptions, WorldGenerationProgressListener worldGenerationProgressListener, boolean debugWorld, long seed, List<?> spawners, boolean shouldTickTime, RandomSequencesState randomSequencesState, CallbackInfo ci, @Local DataFixer dataFixer) {
+	private void noisium$constructorCreateServerWorldChunkManager(MinecraftServer server, Executor workerExecutor, LevelStorage.Session session, ServerWorldProperties serverWorldProperties, RegistryKey<World> worldKey, DimensionOptions dimensionOptions, WorldGenerationProgressListener worldGenerationProgressListener, boolean debugWorld, long seed, List<?> spawners, boolean shouldTickTime, RandomSequencesState randomSequencesState, CallbackInfo ci, @Local DataFixer dataFixer) {
+		@SuppressWarnings("DataFlowIssue")
 		var serverWorld = ((ServerWorld) (Object) this);
+		// DEBUG
+		if (serverWorld.getRegistryKey() != World.OVERWORLD) {
+			return;
+		}
 
 		this.noisium$serverWorldChunkManager = new NoisiumServerWorldChunkManager(
 				serverWorld, dimensionOptions.chunkGenerator(), session.getWorldDirectory(worldKey), dataFixer);

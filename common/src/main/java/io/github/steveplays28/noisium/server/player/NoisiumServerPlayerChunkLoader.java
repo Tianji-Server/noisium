@@ -10,6 +10,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
 import org.jetbrains.annotations.NotNull;
 
@@ -35,8 +36,15 @@ public class NoisiumServerPlayerChunkLoader {
 		PlayerEvent.PLAYER_JOIN.register(player -> previousPlayerPositions.put(player.getId(), player.getPos()));
 		PlayerEvent.PLAYER_QUIT.register(player -> previousPlayerPositions.remove(player.getId()));
 		TickEvent.ServerLevelTick.SERVER_LEVEL_POST.register(
-				instance -> tick(
-						instance, ((NoisiumServerWorldExtension) instance).noisium$getServerWorldChunkManager()::getChunksInRadiusAsync));
+				instance -> {
+					// DEBUG
+					if (instance.getRegistryKey() != World.OVERWORLD) {
+						return;
+					}
+
+					tick(
+							instance, ((NoisiumServerWorldExtension) instance).noisium$getServerWorldChunkManager()::getChunksInRadiusAsync);
+				});
 	}
 
 	// TODO: Enable ticking/update chunk tracking in ServerEntityManager
@@ -51,7 +59,7 @@ public class NoisiumServerPlayerChunkLoader {
 			var player = players.get(i);
 			var playerBlockPos = player.getBlockPos();
 			if (!playerBlockPos.isWithinDistance(previousPlayerPositions.get(player.getId()), 16d)) {
-				var worldChunks = worldChunksSupplier.apply(new ChunkPos(playerBlockPos), 2);
+				var worldChunks = worldChunksSupplier.apply(new ChunkPos(playerBlockPos), 6);
 
 				ChunkUtil.sendWorldChunksToPlayerAsync(serverWorld, new ArrayList<>(worldChunks.values()));
 				CompletableFuture.runAsync(() -> player.networkHandler.sendPacket(
