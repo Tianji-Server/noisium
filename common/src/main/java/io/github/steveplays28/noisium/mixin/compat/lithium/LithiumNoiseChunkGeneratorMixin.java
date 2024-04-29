@@ -42,16 +42,11 @@ public abstract class LithiumNoiseChunkGeneratorMixin extends ChunkGenerator {
 		return blockState;
 	}
 
-	@SuppressWarnings("ForLoopReplaceableByForEach")
 	@Inject(method = "populateNoise(Ljava/util/concurrent/Executor;Lnet/minecraft/world/gen/chunk/Blender;Lnet/minecraft/world/gen/noise/NoiseConfig;Lnet/minecraft/world/gen/StructureAccessor;Lnet/minecraft/world/chunk/Chunk;)Ljava/util/concurrent/CompletableFuture;", at = @At(value = "INVOKE_ASSIGN", target = "Lnet/minecraft/world/chunk/Chunk;getSectionIndex(I)I", ordinal = 1), cancellable = true)
 	private void noisium$populateNoiseInject(Executor executor, Blender blender, NoiseConfig noiseConfig, StructureAccessor structureAccessor, Chunk chunk, CallbackInfoReturnable<CompletableFuture<Chunk>> cir, @Local(ordinal = 1) int minimumYFloorDiv, @Local(ordinal = 2) int generationShapeHeightFloorDiv, @Local(ordinal = 3) int startingChunkSectionIndex, @Local(ordinal = 4) int minimumYChunkSectionIndex) {
-		ChunkSection[] chunkSections = new ChunkSection[startingChunkSectionIndex - minimumYChunkSectionIndex + 1];
-
+		var chunkSections = chunk.getSectionArray();
 		for (int chunkSectionIndex = startingChunkSectionIndex; chunkSectionIndex >= minimumYChunkSectionIndex; --chunkSectionIndex) {
-			ChunkSection chunkSection = chunk.getSection(chunkSectionIndex);
-
-			chunkSection.lock();
-			chunkSections[chunkSectionIndex] = chunkSection;
+			chunkSections[chunkSectionIndex].lock();
 		}
 
 		cir.setReturnValue(CompletableFuture.supplyAsync(
@@ -63,8 +58,8 @@ public abstract class LithiumNoiseChunkGeneratorMixin extends ChunkGenerator {
 				), Util.getMainWorkerExecutor()).whenCompleteAsync((chunk2, throwable) -> {
 			// Replace an enhanced for loop with a fori loop
 			// Also run calculateCounts() on every chunk section to add Lithium compatibility
-			for (int i = 0; i < chunkSections.length; i++) {
-				var chunkSection = chunkSections[i];
+			for (int chunkSectionIndex = startingChunkSectionIndex; chunkSectionIndex >= minimumYChunkSectionIndex; --chunkSectionIndex) {
+				var chunkSection = chunkSections[chunkSectionIndex];
 
 				chunkSection.calculateCounts();
 				chunkSection.unlock();
