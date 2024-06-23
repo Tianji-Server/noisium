@@ -40,9 +40,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 // TODO: Fix canTickBlockEntities() check
 //  The check needs to be changed to point to the server world's isChunkLoaded() method
@@ -55,6 +53,7 @@ public class NoisiumServerWorldChunkManager {
 	private final VersionedChunkStorage versionedChunkStorage;
 	private final NoiseConfig noiseConfig;
 	private final Executor threadPoolExecutor;
+	private final ConcurrentMap<ChunkPos, CompletableFuture<WorldChunk>> loadingWorldChunks;
 	private final Map<ChunkPos, WorldChunk> loadedWorldChunks;
 
 	public NoisiumServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull Path worldDirectoryPath, DataFixer dataFixer) {
@@ -66,6 +65,7 @@ public class NoisiumServerWorldChunkManager {
 		this.versionedChunkStorage = new NoisiumServerVersionedChunkStorage(worldDirectoryPath.resolve("region"), dataFixer, true);
 		this.threadPoolExecutor = Executors.newFixedThreadPool(
 				1, new ThreadFactoryBuilder().setNameFormat("Noisium Server World Chunk Manager %d").build());
+		this.loadingWorldChunks = new ConcurrentHashMap<>();
 		this.loadedWorldChunks = new HashMap<>();
 
 		if (chunkGenerator instanceof NoiseChunkGenerator noiseChunkGenerator) {
@@ -102,9 +102,11 @@ public class NoisiumServerWorldChunkManager {
 	public @NotNull CompletableFuture<WorldChunk> getChunkAsync(ChunkPos chunkPos) {
 		if (loadedWorldChunks.containsKey(chunkPos)) {
 			return CompletableFuture.completedFuture(loadedWorldChunks.get(chunkPos));
+		} else if (loadingWorldChunks.containsKey(chunkPos)) {
+			return loadingWorldChunks.get(chunkPos);
 		}
 
-		return CompletableFuture.supplyAsync(() -> {
+		var worldChunkCompletableFuture = CompletableFuture.supplyAsync(() -> {
 			var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 			if (fetchedNbtData == null) {
 				// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
@@ -122,9 +124,12 @@ public class NoisiumServerWorldChunkManager {
 
 			fetchedWorldChunk.addChunkTickSchedulers(serverWorld);
 			fetchedWorldChunk.loadEntities();
+			loadingWorldChunks.remove(chunkPos);
 			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 			NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 		});
+		loadingWorldChunks.put(chunkPos, worldChunkCompletableFuture);
+		return worldChunkCompletableFuture;
 	}
 
 	/**
@@ -139,6 +144,8 @@ public class NoisiumServerWorldChunkManager {
 		if (loadedWorldChunks.containsKey(chunkPos)) {
 			return loadedWorldChunks.get(chunkPos);
 		}
+		// TODO: Check if loadingWorldChunks.containsKey(chunkPos)
+		// TODO: Add to and remove from loadingWorldChunks when generating a WorldChunk
 
 		var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 		if (fetchedNbtData == null) {
