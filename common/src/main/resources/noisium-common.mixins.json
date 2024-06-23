@@ -8,24 +8,22 @@
     "ChainedBlockSourceMixin",
     "ChunkSectionMixin",
     "GenerationShapeConfigMixin",
-    "server.MinecraftServerMixin",
     "NoiseChunkGeneratorMixin",
     "compat.lithium.LithiumNoiseChunkGeneratorMixin",
-    "NoiseChunkGeneratorMixin",
-    "accessor.NoiseChunkGeneratorAccessor",
-    "server.MinecraftServerMixin",
-    "server.world.ServerChunkManagerMixin",
-    "server.world.ServerEntityManagerMixin",
-    "server.world.ServerWorldMixin",
-    "server.world.ThreadedAnvilChunkStorageMixin",
-    "world.ChunkRegionMixin",
-    "world.WorldMixin",
-    "world.chunk.WorldChunkMixin",
-    "world.gen.chunk.ChunkGeneratorMixin",
-    "world.gen.chunk.NoiseChunkGeneratorMixin"
+    "experimental.accessor.NoiseChunkGeneratorAccessor",
+    "experimental.server.MinecraftServerMixin",
+    "experimental.server.world.ServerChunkManagerMixin",
+    "experimental.server.world.ServerEntityManagerMixin",
+    "experimental.server.world.ServerWorldMixin",
+    "experimental.server.world.ThreadedAnvilChunkStorageMixin",
+    "experimental.world.ChunkRegionMixin",
+    "experimental.world.WorldMixin",
+    "experimental.world.chunk.WorldChunkMixin",
+    "experimental.world.gen.chunk.ChunkGeneratorMixin",
+    "experimental.world.gen.chunk.NoiseChunkGeneratorMixin"
   ],
   "client": [
-    "client.gui.hud.DebugHudMixin"
+    "experimental.client.gui.hud.DebugHudMixin"
   ],
   "injectors": {
     "defaultRequire": 1
