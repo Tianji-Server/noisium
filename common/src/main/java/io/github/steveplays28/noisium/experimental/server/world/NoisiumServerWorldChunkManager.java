@@ -42,6 +42,10 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 
+/**
+ * A chunk manager for {@link ServerWorld}s.
+ * This class cannot extend {@link net.minecraft.server.world.ServerChunkManager} or {@link ChunkManager} due to {@link ServerWorld}s requiring an implementation of {@link net.minecraft.server.world.ServerChunkManager}, which would slow the chunk manager down.
+ */
 // TODO: Fix canTickBlockEntities() check
 //  The check needs to be changed to point to the server world's isChunkLoaded() method
 // TODO: Implement chunk ticking
@@ -285,6 +289,7 @@ public class NoisiumServerWorldChunkManager {
 		return null;
 	}
 
+	// TODO: Move this into the constructor as a Supplier<ChunkPos, ProtoChunk>
 	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos) {
 		var serverLightingProvider = (ServerLightingProvider) serverWorld.getLightingProvider();
 		var protoChunk = new ProtoChunk(chunkPos, UpgradeData.NO_UPGRADE_DATA, serverWorld,

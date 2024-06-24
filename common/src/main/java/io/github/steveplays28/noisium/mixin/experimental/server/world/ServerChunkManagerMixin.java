@@ -27,7 +27,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.function.BooleanSupplier;
 
-// FIXME: Remove this mixin once the server chunk manager is fully replaced
+/**
+ * {@link Mixin} into {@link ServerChunkManager}.
+ * This {@link Mixin} redirects all method calls from the {@link ServerWorld}'s {@link ServerChunkManager} to the {@link ServerWorld}'s {@link io.github.steveplays28.noisium.experimental.server.world.NoisiumServerWorldChunkManager}.
+ */
 @Mixin(ServerChunkManager.class)
 public abstract class ServerChunkManagerMixin {
 	@Shadow
@@ -47,6 +50,13 @@ public abstract class ServerChunkManagerMixin {
 	// TODO: Fix infinite loop
 	@Inject(method = "getChunk(IILnet/minecraft/world/chunk/ChunkStatus;Z)Lnet/minecraft/world/chunk/Chunk;", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, ChunkStatus leastStatus, boolean create, CallbackInfoReturnable<Chunk> cir) {
+		((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().getChunkAsync(
+				new ChunkPos(chunkX, chunkZ)
+		).whenComplete((worldChunk, throwable) -> cir.setReturnValue(worldChunk));
+	}
+
+	@Inject(method = "getChunk(II)Lnet/minecraft/world/chunk/light/LightSourceView;", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<WorldChunk> cir) {
 		((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().getChunkAsync(
 				new ChunkPos(chunkX, chunkZ)
 		).whenComplete((worldChunk, throwable) -> cir.setReturnValue(worldChunk));
