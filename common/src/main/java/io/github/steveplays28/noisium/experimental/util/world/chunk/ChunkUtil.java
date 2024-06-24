@@ -1,15 +1,18 @@
 package io.github.steveplays28.noisium.experimental.util.world.chunk;
 
+import io.github.steveplays28.noisium.Noisium;
 import net.minecraft.block.BlockState;
 import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
 import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
 import net.minecraft.network.packet.s2c.play.LightUpdateS2CPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.crash.CrashException;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.chunk.light.LightingProvider;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.BitSet;
@@ -25,10 +28,16 @@ public class ChunkUtil {
 	 * @param worldChunk  The {@link WorldChunk}.
 	 */
 	public static void sendWorldChunkToPlayer(@NotNull ServerWorld serverWorld, @NotNull WorldChunk worldChunk) {
-		var chunkDataS2CPacket = new ChunkDataS2CPacket(worldChunk, serverWorld.getLightingProvider(), null, null);
-
-		for (int i = 0; i < serverWorld.getPlayers().size(); i++) {
-			serverWorld.getPlayers().get(i).sendChunkPacket(worldChunk.getPos(), chunkDataS2CPacket);
+		try {
+			var chunkDataS2CPacket = new ChunkDataS2CPacket(worldChunk, serverWorld.getLightingProvider(), null, null);
+			for (int i = 0; i < serverWorld.getPlayers().size(); i++) {
+				serverWorld.getPlayers().get(i).sendChunkPacket(worldChunk.getPos(), chunkDataS2CPacket);
+			}
+		} catch (CrashException e) {
+			Noisium.LOGGER.error(
+					"Exception thrown while trying to send a chunk packet to all players in a server world:\n{}",
+					ExceptionUtils.getStackTrace(e)
+			);
 		}
 	}
 
@@ -58,7 +67,8 @@ public class ChunkUtil {
 	public static void sendWorldChunksToPlayerAsync(@NotNull ServerWorld serverWorld, @NotNull List<CompletableFuture<WorldChunk>> worldChunkFutures, @NotNull Executor executor) {
 		// TODO: Send a whole batch of chunks to the player at once to save on network traffic
 		for (int i = 0; i < worldChunkFutures.size(); i++) {
-			worldChunkFutures.get(i).whenCompleteAsync((worldChunk, throwable) -> sendWorldChunkToPlayer(serverWorld, worldChunk), executor);
+			worldChunkFutures.get(i).whenCompleteAsync(
+					(worldChunk, throwable) -> sendWorldChunkToPlayer(serverWorld, worldChunk), executor);
 		}
 	}
 

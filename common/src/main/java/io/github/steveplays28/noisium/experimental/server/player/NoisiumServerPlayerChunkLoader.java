@@ -42,8 +42,7 @@ public class NoisiumServerPlayerChunkLoader {
 						return;
 					}
 
-					tick(
-							instance, ((NoisiumServerWorldExtension) instance).noisium$getServerWorldChunkManager()::getChunksInRadiusAsync);
+					tick(instance, ((NoisiumServerWorldExtension) instance).noisium$getServerWorldChunkManager()::getChunksInRadiusAsync);
 				});
 	}
 
@@ -58,17 +57,18 @@ public class NoisiumServerPlayerChunkLoader {
 		for (int i = 0; i < players.size(); i++) {
 			var player = players.get(i);
 			var playerBlockPos = player.getBlockPos();
-			if (!playerBlockPos.isWithinDistance(previousPlayerPositions.get(player.getId()), 16d)) {
-				var worldChunks = worldChunksSupplier.apply(new ChunkPos(playerBlockPos), 6);
-
-				ChunkUtil.sendWorldChunksToPlayerAsync(serverWorld, new ArrayList<>(worldChunks.values()), threadPoolExecutor);
-				CompletableFuture.runAsync(() -> player.networkHandler.sendPacket(
-						new ChunkRenderDistanceCenterS2CPacket(
-								ChunkSectionPos.getSectionCoord(playerBlockPos.getX()),
-								ChunkSectionPos.getSectionCoord(playerBlockPos.getZ())
-						)), threadPoolExecutor);
-				previousPlayerPositions.put(player.getId(), player.getPos());
+			if (playerBlockPos.isWithinDistance(previousPlayerPositions.get(player.getId()), 16d)) {
+				continue;
 			}
+
+			var worldChunks = worldChunksSupplier.apply(new ChunkPos(playerBlockPos), 6);
+			ChunkUtil.sendWorldChunksToPlayerAsync(serverWorld, new ArrayList<>(worldChunks.values()), threadPoolExecutor);
+			CompletableFuture.runAsync(() -> player.networkHandler.sendPacket(
+					new ChunkRenderDistanceCenterS2CPacket(
+							ChunkSectionPos.getSectionCoord(playerBlockPos.getX()),
+							ChunkSectionPos.getSectionCoord(playerBlockPos.getZ())
+					)), threadPoolExecutor);
+			previousPlayerPositions.put(player.getId(), player.getPos());
 		}
 	}
 }

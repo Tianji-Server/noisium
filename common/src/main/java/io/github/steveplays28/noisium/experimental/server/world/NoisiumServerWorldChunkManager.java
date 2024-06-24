@@ -221,6 +221,7 @@ public class NoisiumServerWorldChunkManager {
 	}
 
 	// TODO: Move into the ServerLightingProvider
+
 	/**
 	 * Updates the chunk's lighting at the specified {@link ChunkSectionPos}.
 	 * This method is ran asynchronously.
