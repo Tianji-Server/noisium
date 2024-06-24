@@ -1,7 +1,6 @@
 package io.github.steveplays28.noisium.experimental.util.world.chunk;
 
 import net.minecraft.block.BlockState;
-import net.minecraft.network.NetworkThreadUtils;
 import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
 import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
 import net.minecraft.network.packet.s2c.play.LightUpdateS2CPacket;
@@ -35,7 +34,7 @@ public class ChunkUtil {
 
 	/**
 	 * Sends a {@link List} of {@link WorldChunk}s to all players in the specified world.
-	 * WARNING: This method blocks the server thread. Prefer using {@link ChunkUtil#sendWorldChunksToPlayerAsync(ServerWorld, List)} instead.
+	 * WARNING: This method blocks the server thread. Prefer using {@link ChunkUtil#sendWorldChunksToPlayerAsync(ServerWorld, List, Executor)} instead.
 	 *
 	 * @param serverWorld The world the {@link WorldChunk} resides in.
 	 * @param worldChunks The {@link List} of {@link WorldChunk}s.
