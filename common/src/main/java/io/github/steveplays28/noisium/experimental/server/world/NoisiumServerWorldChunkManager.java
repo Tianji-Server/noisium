@@ -64,7 +64,7 @@ public class NoisiumServerWorldChunkManager {
 				worldDirectoryPath.resolve("poi"), dataFixer, true, serverWorld.getRegistryManager(), serverWorld);
 		this.versionedChunkStorage = new NoisiumServerVersionedChunkStorage(worldDirectoryPath.resolve("region"), dataFixer, true);
 		this.threadPoolExecutor = Executors.newFixedThreadPool(
-				1, new ThreadFactoryBuilder().setNameFormat("Noisium Server World Chunk Manager %d").build());
+				8, new ThreadFactoryBuilder().setNameFormat("Noisium Server World Chunk Manager %d").build());
 		this.loadingWorldChunks = new ConcurrentHashMap<>();
 		this.loadedWorldChunks = new HashMap<>();
 
@@ -120,6 +120,8 @@ public class NoisiumServerWorldChunkManager {
 		}, threadPoolExecutor).whenComplete((fetchedWorldChunk, throwable) -> {
 			if (throwable != null) {
 				Noisium.LOGGER.error("Exception thrown while getting a chunk asynchronously:\n{}", ExceptionUtils.getStackTrace(throwable));
+				loadingWorldChunks.remove(chunkPos);
+				return;
 			}
 
 			fetchedWorldChunk.addChunkTickSchedulers(serverWorld);
@@ -214,6 +216,7 @@ public class NoisiumServerWorldChunkManager {
 		return this.loadedWorldChunks.containsKey(chunkPos);
 	}
 
+	// TODO: Move into the ServerLightingProvider
 	/**
 	 * Updates the chunk's lighting at the specified {@link ChunkSectionPos}.
 	 * This method is ran asynchronously.
@@ -224,9 +227,8 @@ public class NoisiumServerWorldChunkManager {
 	private void onLightUpdateAsync(@NotNull LightType lightType, @NotNull ChunkSectionPos chunkSectionPosition) {
 		var lightingProvider = serverWorld.getLightingProvider();
 		int bottomY = lightingProvider.getBottomY();
-		int topY = lightingProvider.getTopY();
 		var chunkSectionYPosition = chunkSectionPosition.getSectionY();
-		if (chunkSectionYPosition < bottomY || chunkSectionYPosition > topY) {
+		if (chunkSectionYPosition < bottomY || chunkSectionYPosition > lightingProvider.getTopY()) {
 			return;
 		}
 
@@ -245,7 +247,7 @@ public class NoisiumServerWorldChunkManager {
 				blockLightBits.set(chunkSectionYPositionDifference);
 			}
 			ChunkUtil.sendLightUpdateToPlayers(serverWorld.getPlayers(), lightingProvider, chunkPosition, skyLightBits, blockLightBits);
-		});
+		}, threadPoolExecutor);
 	}
 
 	// TODO: Check if this can be ran asynchronously

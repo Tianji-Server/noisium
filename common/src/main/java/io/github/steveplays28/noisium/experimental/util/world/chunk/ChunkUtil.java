@@ -1,6 +1,7 @@
 package io.github.steveplays28.noisium.experimental.util.world.chunk;
 
 import net.minecraft.block.BlockState;
+import net.minecraft.network.NetworkThreadUtils;
 import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
 import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
 import net.minecraft.network.packet.s2c.play.LightUpdateS2CPacket;
@@ -15,6 +16,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.BitSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 public class ChunkUtil {
 	/**
@@ -54,10 +56,10 @@ public class ChunkUtil {
 	 * @param worldChunkFutures The {@link List} of {@link CompletableFuture<WorldChunk>}s
 	 */
 	@SuppressWarnings("ForLoopReplaceableByForEach")
-	public static void sendWorldChunksToPlayerAsync(@NotNull ServerWorld serverWorld, @NotNull List<CompletableFuture<WorldChunk>> worldChunkFutures) {
+	public static void sendWorldChunksToPlayerAsync(@NotNull ServerWorld serverWorld, @NotNull List<CompletableFuture<WorldChunk>> worldChunkFutures, @NotNull Executor executor) {
 		// TODO: Send a whole batch of chunks to the player at once to save on network traffic
 		for (int i = 0; i < worldChunkFutures.size(); i++) {
-			worldChunkFutures.get(i).whenCompleteAsync((worldChunk, throwable) -> sendWorldChunkToPlayer(serverWorld, worldChunk));
+			worldChunkFutures.get(i).whenCompleteAsync((worldChunk, throwable) -> sendWorldChunkToPlayer(serverWorld, worldChunk), executor);
 		}
 	}
 

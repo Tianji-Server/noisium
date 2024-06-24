@@ -51,7 +51,7 @@ public class NoisiumServerPlayerChunkLoader {
 	@SuppressWarnings("ForLoopReplaceableByForEach")
 	private void tick(@NotNull ServerWorld serverWorld, @NotNull BiFunction<ChunkPos, Integer, Map<ChunkPos, CompletableFuture<WorldChunk>>> worldChunksSupplier) {
 		var players = serverWorld.getPlayers();
-		if (players.size() == 0 || previousPlayerPositions.size() == 0) {
+		if (players.isEmpty() || previousPlayerPositions.isEmpty()) {
 			return;
 		}
 
@@ -61,7 +61,7 @@ public class NoisiumServerPlayerChunkLoader {
 			if (!playerBlockPos.isWithinDistance(previousPlayerPositions.get(player.getId()), 16d)) {
 				var worldChunks = worldChunksSupplier.apply(new ChunkPos(playerBlockPos), 6);
 
-				ChunkUtil.sendWorldChunksToPlayerAsync(serverWorld, new ArrayList<>(worldChunks.values()));
+				ChunkUtil.sendWorldChunksToPlayerAsync(serverWorld, new ArrayList<>(worldChunks.values()), threadPoolExecutor);
 				CompletableFuture.runAsync(() -> player.networkHandler.sendPacket(
 						new ChunkRenderDistanceCenterS2CPacket(
 								ChunkSectionPos.getSectionCoord(playerBlockPos.getX()),
