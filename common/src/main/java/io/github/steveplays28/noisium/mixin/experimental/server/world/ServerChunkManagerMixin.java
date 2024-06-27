@@ -1,5 +1,6 @@
 package io.github.steveplays28.noisium.mixin.experimental.server.world;
 
+import com.mojang.datafixers.DataFixer;
 import io.github.steveplays28.noisium.experimental.extension.world.server.NoisiumServerWorldExtension;
 import io.github.steveplays28.noisium.experimental.server.world.chunk.event.NoisiumServerChunkEvent;
 import io.github.steveplays28.noisium.experimental.server.world.event.NoisiumServerTickEvent;
@@ -7,25 +8,38 @@ import io.github.steveplays28.noisium.experimental.util.world.chunk.networking.p
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.server.WorldGenerationProgressListener;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerChunkManager;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.world.ThreadedAnvilChunkStorage;
+import net.minecraft.structure.StructureTemplateManager;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.LightType;
+import net.minecraft.world.PersistentStateManager;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkStatus;
+import net.minecraft.world.chunk.ChunkStatusChangeListener;
 import net.minecraft.world.chunk.WorldChunk;
-import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
+import net.minecraft.world.gen.chunk.ChunkGenerator;
+import net.minecraft.world.gen.chunk.placement.StructurePlacementCalculator;
+import net.minecraft.world.gen.noise.NoiseConfig;
+import net.minecraft.world.level.storage.LevelStorage;
+import net.minecraft.world.storage.NbtScannable;
+import org.jetbrains.annotations.NotNull;
+import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /**
  * {@link Mixin} into {@link ServerChunkManager}.
@@ -36,13 +50,39 @@ public abstract class ServerChunkManagerMixin {
 	@Shadow
 	public abstract World getWorld();
 
+	@Mutable
+	@Shadow
+	@Final
+	public ThreadedAnvilChunkStorage threadedAnvilChunkStorage;
+
+	@Shadow
+	public abstract @NotNull ChunkGenerator getChunkGenerator();
+
+	@Shadow
+	public abstract @NotNull NoiseConfig getNoiseConfig();
+
+	@Unique
+	private ChunkGenerator noisium$chunkGenerator;
+	@Unique
+	private StructurePlacementCalculator noisium$structurePlacementCalculator;
+
+	@Inject(method = "<init>", at = @At(value = "TAIL"))
+	private void noisium$constructorInject(ServerWorld world, LevelStorage.Session session, DataFixer dataFixer, StructureTemplateManager structureTemplateManager, Executor workerExecutor, @NotNull ChunkGenerator chunkGenerator, int viewDistance, int simulationDistance, boolean dsync, WorldGenerationProgressListener worldGenerationProgressListener, ChunkStatusChangeListener chunkStatusChangeListener, Supplier<PersistentStateManager> persistentStateManagerFactory, CallbackInfo ci) {
+		noisium$chunkGenerator = chunkGenerator;
+		noisium$structurePlacementCalculator = this.getChunkGenerator().createStructurePlacementCalculator(
+				this.getWorld().getRegistryManager().getWrapperOrThrow(RegistryKeys.STRUCTURE_SET), this.getNoiseConfig(),
+				((ServerWorld) this.getWorld()).getSeed()
+		);
+		threadedAnvilChunkStorage = null;
+	}
+
 	@Inject(method = "executeQueuedTasks", at = @At(value = "HEAD"), cancellable = true)
-	private void noisium$stopServerChunkManagerFromRunningTasks(CallbackInfoReturnable<Boolean> cir) {
+	private void noisium$stopServerChunkManagerFromRunningTasks(@NotNull CallbackInfoReturnable<Boolean> cir) {
 		cir.setReturnValue(true);
 	}
 
 	@Inject(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "HEAD"), cancellable = true)
-	private void noisium$stopServerChunkManagerFromTicking(BooleanSupplier shouldKeepTicking, boolean tickChunks, CallbackInfo ci) {
+	private void noisium$stopServerChunkManagerFromTicking(@NotNull BooleanSupplier shouldKeepTicking, boolean tickChunks, @NotNull CallbackInfo ci) {
 		NoisiumServerTickEvent.SERVER_ENTITY_MOVEMENT_TICK.invoker().onServerEntityMovementTick();
 		ci.cancel();
 	}
@@ -50,23 +90,38 @@ public abstract class ServerChunkManagerMixin {
 	// TODO: Fix infinite loop
 	@Inject(method = "getChunk(IILnet/minecraft/world/chunk/ChunkStatus;Z)Lnet/minecraft/world/chunk/Chunk;", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, ChunkStatus leastStatus, boolean create, CallbackInfoReturnable<Chunk> cir) {
-		((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().getChunkAsync(
-				new ChunkPos(chunkX, chunkZ)
-		).whenComplete((worldChunk, throwable) -> cir.setReturnValue(worldChunk));
+		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager();
+		var chunkPosition = new ChunkPos(chunkX, chunkZ);
+		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
+			cir.setReturnValue(null);
+			return;
+		}
+
+		cir.setReturnValue(noisiumServerWorldChunkManager.getChunk(chunkPosition));
 	}
 
 	@Inject(method = "getChunk(II)Lnet/minecraft/world/chunk/light/LightSourceView;", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<WorldChunk> cir) {
-		((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().getChunkAsync(
-				new ChunkPos(chunkX, chunkZ)
-		).whenComplete((worldChunk, throwable) -> cir.setReturnValue(worldChunk));
+		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager();
+		var chunkPosition = new ChunkPos(chunkX, chunkZ);
+		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
+			cir.setReturnValue(null);
+			return;
+		}
+
+		cir.setReturnValue(noisiumServerWorldChunkManager.getChunk(chunkPosition));
 	}
 
 	@Inject(method = "getWorldChunk", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$getWorldChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<WorldChunk> cir) {
-		((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().getChunkAsync(
-				new ChunkPos(chunkX, chunkZ)
-		).whenComplete((worldChunk, throwable) -> cir.setReturnValue(worldChunk));
+		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager();
+		var chunkPosition = new ChunkPos(chunkX, chunkZ);
+		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
+			cir.setReturnValue(null);
+			return;
+		}
+
+		cir.setReturnValue(noisiumServerWorldChunkManager.getChunk(chunkPosition));
 	}
 
 	// TODO: Don't send this packet to players out of range, to save on bandwidth
@@ -139,8 +194,39 @@ public abstract class ServerChunkManagerMixin {
 	}
 
 	@Inject(method = "isChunkLoaded", at = @At(value = "HEAD"), cancellable = true)
-	private void noisium$isChunkLoadedInNoisiumServerChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<Boolean> cir) {
+	private void noisium$isChunkLoadedInNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<Boolean> cir) {
 		cir.setReturnValue(((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().isChunkLoaded(
 				new ChunkPos(chunkX, chunkZ)));
+	}
+
+	@Inject(method = "getStructurePlacementCalculator", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$getStructurePlacementCalculatorFromServerChunkManager(CallbackInfoReturnable<StructurePlacementCalculator> cir) {
+		cir.setReturnValue(noisium$structurePlacementCalculator);
+	}
+
+	@Inject(method = "getChunkGenerator", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$getChunkGeneratorFromServerChunkManager(@NotNull CallbackInfoReturnable<ChunkGenerator> cir) {
+		cir.setReturnValue(noisium$chunkGenerator);
+	}
+
+	@Inject(method = "getNoiseConfig", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$getNoiseConfigFromServerChunkManager(@NotNull CallbackInfoReturnable<NoiseConfig> cir) {
+		cir.setReturnValue(((NoisiumServerWorldExtension) this.getWorld()).noisium$getNoiseConfig());
+	}
+
+	@Inject(method = "getChunkIoWorker", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$getChunkIoWorkerFromNoisiumServerWorldChunkManager(@NotNull CallbackInfoReturnable<NbtScannable> cir) {
+		cir.setReturnValue(((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager().getChunkIoWorker());
+	}
+
+	@Inject(method = {"getLoadedChunkCount", "getTotalChunksLoadedCount"}, at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$getTotalChunksLoadedCountFromNoisiumServerWorldChunkManager(@NotNull CallbackInfoReturnable<Integer> cir) {
+		// TODO: Remove the method call for 441 start chunks, replace the 2 method calls for client/server chunk count debugging with an event listener and remove this mixin injection
+		cir.setReturnValue(0);
+	}
+
+	@Inject(method = {"applyViewDistance", "applySimulationDistance"}, at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$cancelApplyViewAndSimulationDistance(int distance, @NotNull CallbackInfo ci) {
+		ci.cancel();
 	}
 }

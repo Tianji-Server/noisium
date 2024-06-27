@@ -12,6 +12,7 @@ import io.github.steveplays28.noisium.experimental.util.world.chunk.networking.p
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.WorldGenerationProgressListener;
 import net.minecraft.server.world.ChunkLevelType;
@@ -20,14 +21,18 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.RandomSequencesState;
 import net.minecraft.util.profiler.Profiler;
+import net.minecraft.world.PersistentStateManager;
 import net.minecraft.world.World;
 import net.minecraft.world.dimension.DimensionOptions;
+import net.minecraft.world.gen.chunk.ChunkGenerator;
+import net.minecraft.world.gen.chunk.ChunkGeneratorSettings;
+import net.minecraft.world.gen.chunk.NoiseChunkGenerator;
+import net.minecraft.world.gen.noise.NoiseConfig;
 import net.minecraft.world.level.ServerWorldProperties;
 import net.minecraft.world.level.storage.LevelStorage;
-import org.spongepowered.asm.mixin.Final;
-import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
+import org.jetbrains.annotations.NotNull;
+import org.objectweb.asm.Opcodes;
+import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -36,6 +41,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.List;
 import java.util.concurrent.Executor;
 
+@Debug(export = true)
 @Mixin(ServerWorld.class)
 public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 	@Shadow
@@ -45,23 +51,33 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 	@Shadow
 	public abstract boolean isChunkLoaded(long chunkPos);
 
+	@Shadow public abstract void tickEntity(Entity entity);
+
+	@Unique
+	private NoiseConfig noisium$noiseConfig;
 	@Unique
 	private NoisiumServerWorldChunkManager noisium$serverWorldChunkManager;
 	@Unique
 	private NoisiumServerWorldEntityTracker noisium$serverWorldEntityManager;
 
-	@Inject(method = "<init>", at = @At(value = "TAIL"))
-	private void noisium$constructorCreateServerWorldChunkManager(MinecraftServer server, Executor workerExecutor, LevelStorage.Session session, ServerWorldProperties serverWorldProperties, RegistryKey<World> worldKey, DimensionOptions dimensionOptions, WorldGenerationProgressListener worldGenerationProgressListener, boolean debugWorld, long seed, List<?> spawners, boolean shouldTickTime, RandomSequencesState randomSequencesState, CallbackInfo ci, @Local DataFixer dataFixer) {
+	@Inject(method = "<init>", at = @At(value = "INVOKE_ASSIGN", target = "Lnet/minecraft/server/MinecraftServer;getDataFixer()Lcom/mojang/datafixers/DataFixer;", shift = At.Shift.AFTER))
+	private void noisium$constructorCreateServerWorldChunkManager(@NotNull MinecraftServer server, Executor workerExecutor, @NotNull LevelStorage.Session session, @NotNull ServerWorldProperties serverWorldProperties, @NotNull RegistryKey<World> worldKey, @NotNull DimensionOptions dimensionOptions, WorldGenerationProgressListener worldGenerationProgressListener, boolean debugWorld, long seed, List<?> spawners, boolean shouldTickTime, RandomSequencesState randomSequencesState, @NotNull CallbackInfo ci, @Local @NotNull DataFixer dataFixer) {
 		@SuppressWarnings("DataFlowIssue")
 		var serverWorld = ((ServerWorld) (Object) this);
-		// DEBUG
-		if (serverWorld.getRegistryKey() != World.OVERWORLD) {
-			return;
+		@NotNull ChunkGenerator chunkGenerator = dimensionOptions.chunkGenerator();
+		@NotNull ChunkGeneratorSettings chunkGeneratorSettings;
+		if (chunkGenerator instanceof NoiseChunkGenerator noiseChunkGenerator) {
+			chunkGeneratorSettings = noiseChunkGenerator.getSettings().value();
+		} else {
+			chunkGeneratorSettings = ChunkGeneratorSettings.createMissingSettings();
 		}
-
-		this.noisium$serverWorldChunkManager = new NoisiumServerWorldChunkManager(
-				serverWorld, dimensionOptions.chunkGenerator(), session.getWorldDirectory(worldKey), dataFixer);
-		this.noisium$serverWorldEntityManager = new NoisiumServerWorldEntityTracker(
+		noisium$noiseConfig = NoiseConfig.create(
+				chunkGeneratorSettings, serverWorld.getRegistryManager().getWrapperOrThrow(RegistryKeys.NOISE_PARAMETERS),
+				serverWorld.getSeed()
+		);
+		noisium$serverWorldChunkManager = new NoisiumServerWorldChunkManager(
+				serverWorld, chunkGenerator, noisium$noiseConfig, session.getWorldDirectory(worldKey), dataFixer);
+		noisium$serverWorldEntityManager = new NoisiumServerWorldEntityTracker(
 				packet -> PacketUtil.sendPacketToPlayers(serverWorld.getPlayers(), packet));
 
 		// TODO: Redo the server entity manager entirely, in an event-based way
@@ -81,15 +97,37 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 				worldChunk -> this.entityManager.updateTrackingStatus(worldChunk.getPos(), ChunkLevelType.ENTITY_TICKING));
 	}
 
+	@Inject(method = "getPersistentStateManager", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$getPersistentStateManagerFromNoisiumServerWorldChunkManager(@NotNull CallbackInfoReturnable<PersistentStateManager> cir) {
+		cir.setReturnValue(((NoisiumServerWorldExtension) this).noisium$getServerWorldChunkManager().getPersistentStateManager());
+	}
+
 	@Inject(method = "isTickingFutureReady", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$checkIfTickingFutureIsReadyByCheckingIfTheChunkIsLoaded(long chunkPos, CallbackInfoReturnable<Boolean> cir) {
 		cir.setReturnValue(this.isChunkLoaded(chunkPos));
 	}
 
-	@SuppressWarnings("unused")
-	@ModifyExpressionValue(method = "method_31420", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ChunkTicketManager;shouldTickEntities(J)Z"))
-	private boolean noisium$redirectShouldTickEntitiesToEntityManager(boolean original, Profiler profiler, Entity entity) {
-		return this.entityManager.shouldTick(entity.getChunkPos());
+	@Inject(method = "method_31420", at = @At(value = "FIELD", target = "Lnet/minecraft/server/world/ServerChunkManager;threadedAnvilChunkStorage:Lnet/minecraft/server/world/ThreadedAnvilChunkStorage;", opcode = Opcodes.GETFIELD), cancellable = true)
+	private void noisium$redirectShouldTickEntities(@NotNull Profiler profiler, @NotNull Entity entity, @NotNull CallbackInfo ci) {
+		if (!this.entityManager.shouldTick(entity.getChunkPos())) {
+			ci.cancel();
+			return;
+		}
+
+		var vehicleEntity = entity.getVehicle();
+		if (vehicleEntity != null) {
+			if (!vehicleEntity.isRemoved() && vehicleEntity.hasPassenger(entity)) {
+				ci.cancel();
+				return;
+			}
+
+			entity.stopRiding();
+		}
+
+		profiler.push("tick");
+		this.tickEntity(entity);
+		profiler.pop();
+		ci.cancel();
 	}
 
 	@Inject(method = "onBlockChanged", at = @At(value = "HEAD"), cancellable = true)
@@ -101,5 +139,10 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 	@Override
 	public NoisiumServerWorldChunkManager noisium$getServerWorldChunkManager() {
 		return noisium$serverWorldChunkManager;
+	}
+
+	@Override
+	public NoiseConfig noisium$getNoiseConfig() {
+		return noisium$noiseConfig;
 	}
 }

@@ -9,11 +9,15 @@ import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.ProtoChunk;
 import net.minecraft.world.chunk.UpgradeData;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
 
@@ -42,7 +46,7 @@ public abstract class ChunkRegionMixin implements StructureWorldAccess {
 	 * @reason Workaround for there not being {@code null} checks when the specified chunk position isn't in this {@link ChunkRegion}'s bounds.
 	 */
 	@Overwrite
-	public @Nullable Chunk getChunk(int chunkPosX, int chunkPosZ, ChunkStatus leastChunkStatus, boolean create) {
+	public @Nullable Chunk getChunk(int chunkPosX, int chunkPosZ, @NotNull ChunkStatus leastChunkStatus, boolean create) {
 		if (!this.isChunkLoaded(chunkPosX, chunkPosZ)) {
 			// TODO: Replace the ProtoChunk instances with null and add null checks where needed using ASM
 			var protoChunk = new ProtoChunk(
@@ -55,7 +59,7 @@ public abstract class ChunkRegionMixin implements StructureWorldAccess {
 
 		int i = chunkPosX - this.lowerCorner.x;
 		int j = chunkPosZ - this.lowerCorner.z;
-		var chunk = (Chunk) this.chunks.get(i + j * this.width);
+		var chunk = this.chunks.get(i + j * this.width);
 		if (chunk.getStatus().isAtLeast(leastChunkStatus)) {
 			return chunk;
 		}
@@ -67,5 +71,11 @@ public abstract class ChunkRegionMixin implements StructureWorldAccess {
 		protoChunk.setLightingProvider(world.getLightingProvider());
 		protoChunk.setStatus(ChunkStatus.FULL);
 		return protoChunk;
+	}
+
+	@Inject(method = "needsBlending", at = @At(value = "HEAD"), cancellable = true)
+	private void noisium$cancelBlending(ChunkPos chunkPosition, int checkRadius, CallbackInfoReturnable<Boolean> cir) {
+		// TODO: Reimplement chunk blending
+		cir.setReturnValue(false);
 	}
 }

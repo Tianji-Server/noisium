@@ -2,6 +2,7 @@ package io.github.steveplays28.noisium.experimental.server.world;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.mojang.datafixers.DataFixer;
+import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.TickEvent;
 import io.github.steveplays28.noisium.Noisium;
 import io.github.steveplays28.noisium.experimental.extension.world.chunk.NoisiumWorldChunkExtension;
@@ -19,20 +20,17 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.ChunkRegion;
-import net.minecraft.world.ChunkSerializer;
-import net.minecraft.world.Heightmap;
-import net.minecraft.world.LightType;
+import net.minecraft.world.*;
 import net.minecraft.world.chunk.*;
 import net.minecraft.world.gen.GenerationStep;
 import net.minecraft.world.gen.chunk.Blender;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
-import net.minecraft.world.gen.chunk.ChunkGeneratorSettings;
 import net.minecraft.world.gen.chunk.NoiseChunkGenerator;
 import net.minecraft.world.gen.noise.NoiseConfig;
 import net.minecraft.world.poi.PointOfInterestStorage;
 import net.minecraft.world.poi.PointOfInterestType;
 import net.minecraft.world.poi.PointOfInterestTypes;
+import net.minecraft.world.storage.NbtScannable;
 import net.minecraft.world.storage.VersionedChunkStorage;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jetbrains.annotations.NotNull;
@@ -53,36 +51,31 @@ import java.util.concurrent.*;
 public class NoisiumServerWorldChunkManager {
 	private final ServerWorld serverWorld;
 	private final ChunkGenerator chunkGenerator;
+	private final NoiseConfig noiseConfig;
+	private final PersistentStateManager persistentStateManager;
 	private final PointOfInterestStorage pointOfInterestStorage;
 	private final VersionedChunkStorage versionedChunkStorage;
-	private final NoiseConfig noiseConfig;
 	private final Executor threadPoolExecutor;
 	private final ConcurrentMap<ChunkPos, CompletableFuture<WorldChunk>> loadingWorldChunks;
 	private final Map<ChunkPos, WorldChunk> loadedWorldChunks;
 
-	public NoisiumServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull Path worldDirectoryPath, DataFixer dataFixer) {
+	@SuppressWarnings("ResultOfMethodCallIgnored")
+	public NoisiumServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull NoiseConfig noiseConfig, @NotNull Path worldDirectoryPath, DataFixer dataFixer) {
 		this.serverWorld = serverWorld;
 		this.chunkGenerator = chunkGenerator;
+		this.noiseConfig = noiseConfig;
 
+		var worldDataFile = worldDirectoryPath.resolve("data").toFile();
+		worldDataFile.mkdirs();
+		this.persistentStateManager = new PersistentStateManager(worldDataFile, dataFixer);
 		this.pointOfInterestStorage = new PointOfInterestStorage(
-				worldDirectoryPath.resolve("poi"), dataFixer, true, serverWorld.getRegistryManager(), serverWorld);
-		this.versionedChunkStorage = new NoisiumServerVersionedChunkStorage(worldDirectoryPath.resolve("region"), dataFixer, true);
+				worldDirectoryPath.resolve("poi"), dataFixer, false, serverWorld.getRegistryManager(), serverWorld);
+		this.versionedChunkStorage = new VersionedChunkStorage(worldDirectoryPath.resolve("region"), dataFixer, false);
 		this.threadPoolExecutor = Executors.newFixedThreadPool(
-				8, new ThreadFactoryBuilder().setNameFormat("Noisium Server World Chunk Manager %d").build());
+				4, new ThreadFactoryBuilder().setNameFormat(
+						"Noisium Server World Chunk Manager " + serverWorld.getDimension().effects() + " %d").build());
 		this.loadingWorldChunks = new ConcurrentHashMap<>();
 		this.loadedWorldChunks = new HashMap<>();
-
-		if (chunkGenerator instanceof NoiseChunkGenerator noiseChunkGenerator) {
-			this.noiseConfig = NoiseConfig.create(
-					noiseChunkGenerator.getSettings().value(),
-					serverWorld.getRegistryManager().getWrapperOrThrow(RegistryKeys.NOISE_PARAMETERS), serverWorld.getSeed()
-			);
-		} else {
-			this.noiseConfig = NoiseConfig.create(
-					ChunkGeneratorSettings.createMissingSettings(),
-					serverWorld.getRegistryManager().getWrapperOrThrow(RegistryKeys.NOISE_PARAMETERS), serverWorld.getSeed()
-			);
-		}
 
 		NoisiumServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
 		NoisiumServerChunkEvent.BLOCK_CHANGE.register(this::onBlockChange);
@@ -92,7 +85,9 @@ public class NoisiumServerWorldChunkManager {
 			}
 
 			((ServerLightingProvider) serverWorld.getLightingProvider()).tick();
+			pointOfInterestStorage.tick(() -> true);
 		});
+		LifecycleEvent.SERVER_STOPPING.register(instance -> ((ServerLightingProvider) serverWorld.getLightingProvider()).close());
 	}
 
 	/**
@@ -117,6 +112,8 @@ public class NoisiumServerWorldChunkManager {
 				return new WorldChunk(serverWorld, generateChunk(chunkPos), null);
 			}
 
+			versionedChunkStorage.updateChunkNbt(
+					serverWorld.getRegistryKey(), () -> persistentStateManager, fetchedNbtData, this.chunkGenerator.getCodecKey());
 			var fetchedChunk = ChunkSerializer.deserialize(serverWorld, pointOfInterestStorage, chunkPos, fetchedNbtData);
 			return new WorldChunk(serverWorld, fetchedChunk,
 					chunkToAddEntitiesTo -> serverWorld.addEntities(EntityType.streamFromNbt(fetchedChunk.getEntities(), serverWorld))
@@ -149,9 +146,9 @@ public class NoisiumServerWorldChunkManager {
 	public @NotNull WorldChunk getChunk(ChunkPos chunkPos) {
 		if (loadedWorldChunks.containsKey(chunkPos)) {
 			return loadedWorldChunks.get(chunkPos);
+		} else if (loadingWorldChunks.containsKey(chunkPos)) {
+			return loadingWorldChunks.get(chunkPos).join();
 		}
-		// TODO: Check if loadingWorldChunks.containsKey(chunkPos)
-		// TODO: Add to and remove from loadingWorldChunks when generating a WorldChunk
 
 		var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 		if (fetchedNbtData == null) {
@@ -168,7 +165,6 @@ public class NoisiumServerWorldChunkManager {
 		);
 		fetchedWorldChunk.addChunkTickSchedulers(serverWorld);
 		fetchedWorldChunk.loadEntities();
-
 		loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 		NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 		return fetchedWorldChunk;
@@ -218,6 +214,14 @@ public class NoisiumServerWorldChunkManager {
 
 	public boolean isChunkLoaded(ChunkPos chunkPos) {
 		return this.loadedWorldChunks.containsKey(chunkPos);
+	}
+
+	public @NotNull NbtScannable getChunkIoWorker() {
+		return versionedChunkStorage.getWorker();
+	}
+
+	public @NotNull PersistentStateManager getPersistentStateManager() {
+		return persistentStateManager;
 	}
 
 	// TODO: Move into the ServerLightingProvider
@@ -361,7 +365,10 @@ public class NoisiumServerWorldChunkManager {
 		serverLightingProvider.light(protoChunk, protoChunk.isLightOn());
 
 		protoChunk.setStatus(ChunkStatus.FULL);
+		pointOfInterestStorage.saveChunk(chunkPos);
 		versionedChunkStorage.setNbt(chunkPos, ChunkSerializer.serialize(serverWorld, protoChunk));
+		// TODO: Add a (Neo)Forge ChunkDataEvent.Save invoker
+		//  Also add a Fabric/Architectury chunk save event invoker
 		return protoChunk;
 	}
 }
