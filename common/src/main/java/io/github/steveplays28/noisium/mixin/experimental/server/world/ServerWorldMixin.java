@@ -1,6 +1,5 @@
 package io.github.steveplays28.noisium.mixin.experimental.server.world;
 
-import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.datafixers.DataFixer;
 import dev.architectury.event.events.common.PlayerEvent;
@@ -8,6 +7,7 @@ import io.github.steveplays28.noisium.experimental.extension.world.server.Noisiu
 import io.github.steveplays28.noisium.experimental.server.world.NoisiumServerWorldChunkManager;
 import io.github.steveplays28.noisium.experimental.server.world.chunk.event.NoisiumServerChunkEvent;
 import io.github.steveplays28.noisium.experimental.server.world.entity.NoisiumServerWorldEntityTracker;
+import io.github.steveplays28.noisium.experimental.server.world.entity.player.NoisiumServerWorldPlayerChunkLoader;
 import io.github.steveplays28.noisium.experimental.util.world.chunk.networking.packet.PacketUtil;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
@@ -51,14 +51,28 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 	@Shadow
 	public abstract boolean isChunkLoaded(long chunkPos);
 
-	@Shadow public abstract void tickEntity(Entity entity);
+	@Shadow
+	public abstract void tickEntity(Entity entity);
 
 	@Unique
 	private NoiseConfig noisium$noiseConfig;
+	/**
+	 * Keeps a reference to this {@link ServerWorld}'s {@link NoisiumServerWorldChunkManager}, to make sure it doesn't get garbage collected until the object is no longer necessary.
+	 */
 	@Unique
 	private NoisiumServerWorldChunkManager noisium$serverWorldChunkManager;
+	/**
+	 * Keeps a reference to this {@link ServerWorld}'s {@link NoisiumServerWorldEntityTracker}, to make sure it doesn't get garbage collected until the object is no longer necessary.
+	 */
+	@SuppressWarnings({"unused", "FieldCanBeLocal"})
 	@Unique
 	private NoisiumServerWorldEntityTracker noisium$serverWorldEntityManager;
+	/**
+	 * Keeps a reference to this {@link ServerWorld}'s {@link NoisiumServerWorldPlayerChunkLoader}, to make sure it doesn't get garbage collected until the object is no longer necessary.
+	 */
+	@SuppressWarnings({"unused", "FieldCanBeLocal"})
+	@Unique
+	private NoisiumServerWorldPlayerChunkLoader noisium$serverWorldPlayerChunkLoader;
 
 	@Inject(method = "<init>", at = @At(value = "INVOKE_ASSIGN", target = "Lnet/minecraft/server/MinecraftServer;getDataFixer()Lcom/mojang/datafixers/DataFixer;", shift = At.Shift.AFTER))
 	private void noisium$constructorCreateServerWorldChunkManager(@NotNull MinecraftServer server, Executor workerExecutor, @NotNull LevelStorage.Session session, @NotNull ServerWorldProperties serverWorldProperties, @NotNull RegistryKey<World> worldKey, @NotNull DimensionOptions dimensionOptions, WorldGenerationProgressListener worldGenerationProgressListener, boolean debugWorld, long seed, List<?> spawners, boolean shouldTickTime, RandomSequencesState randomSequencesState, @NotNull CallbackInfo ci, @Local @NotNull DataFixer dataFixer) {
@@ -79,6 +93,8 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 				serverWorld, chunkGenerator, noisium$noiseConfig, session.getWorldDirectory(worldKey), dataFixer);
 		noisium$serverWorldEntityManager = new NoisiumServerWorldEntityTracker(
 				packet -> PacketUtil.sendPacketToPlayers(serverWorld.getPlayers(), packet));
+		noisium$serverWorldPlayerChunkLoader = new NoisiumServerWorldPlayerChunkLoader(
+				serverWorld, ((NoisiumServerWorldExtension) serverWorld).noisium$getServerWorldChunkManager()::getChunksInRadiusAsync);
 
 		// TODO: Redo the server entity manager entirely, in an event-based way
 		//  Also remove this line when that's done, since this doesn't belong here

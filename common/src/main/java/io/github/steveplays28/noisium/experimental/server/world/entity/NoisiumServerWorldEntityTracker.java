@@ -22,12 +22,13 @@ import java.util.function.Consumer;
 public class NoisiumServerWorldEntityTracker {
 	private static final @NotNull Logger LOGGER = LoggerFactory.getLogger("Noisium Server World Entity Tracker");
 
-	private final @NotNull Map<Integer, EntityTrackerEntry> entityTrackerEntries;
 	private final @NotNull Consumer<Packet<?>> packetSendConsumer;
+	private final @NotNull Map<Integer, EntityTrackerEntry> entityTrackerEntries;
 
 	public NoisiumServerWorldEntityTracker(@NotNull Consumer<Packet<?>> packetSendConsumer) {
-		this.entityTrackerEntries = new HashMap<>();
 		this.packetSendConsumer = packetSendConsumer;
+
+		this.entityTrackerEntries = new HashMap<>();
 
 		EntityEvent.ADD.register(this::onEntityAdded);
 		NoisiumServerEntityEvent.REMOVE.register(this::onEntityRemoved);
