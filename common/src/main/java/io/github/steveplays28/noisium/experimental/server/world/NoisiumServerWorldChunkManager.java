@@ -87,7 +87,12 @@ public class NoisiumServerWorldChunkManager {
 			((ServerLightingProvider) serverWorld.getLightingProvider()).tick();
 			pointOfInterestStorage.tick(() -> true);
 		});
-		LifecycleEvent.SERVER_STOPPING.register(instance -> ((ServerLightingProvider) serverWorld.getLightingProvider()).close());
+		LifecycleEvent.SERVER_STOPPING.register(instance -> {
+			for (var loadingWorldChunkCompletableFuture : loadingWorldChunks.values()) {
+				loadingWorldChunkCompletableFuture.cancel(true);
+			}
+			((ServerLightingProvider) serverWorld.getLightingProvider()).close();
+		});
 	}
 
 	/**
