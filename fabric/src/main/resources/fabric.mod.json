@@ -27,6 +27,9 @@
       ],
       "curseforge": "${curseforge_project_id}",
       "modrinth": "${modrinth_project_id}"
+    },
+    "lithium:options": {
+      "world.inline_block_access": false
     }
   },
   "environment": "*",
