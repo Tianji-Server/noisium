@@ -87,6 +87,11 @@ public abstract class ServerChunkManagerMixin {
 		ci.cancel();
 	}
 
+	@Inject(method = "close", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ThreadedAnvilChunkStorage;close()V", shift = At.Shift.BEFORE), cancellable = true)
+	private void noisium$cancelRemoveThreadedAnvilChunkStorageClose(@NotNull CallbackInfo ci) {
+		ci.cancel();
+	}
+
 	// TODO: Fix infinite loop
 	@Inject(method = "getChunk(IILnet/minecraft/world/chunk/ChunkStatus;Z)Lnet/minecraft/world/chunk/Chunk;", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, ChunkStatus leastStatus, boolean create, CallbackInfoReturnable<Chunk> cir) {
