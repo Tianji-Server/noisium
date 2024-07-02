@@ -109,8 +109,8 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 		// TODO: Move this event listener registration to ServerEntityManagerMixin
 		//  or (when it's finished and able to completely replace the vanilla class) to NoisiumServerWorldEntityTracker
 		//  More efficient methods can be used when registering the event listener directly in the server entity manager
-		NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.register(
-				worldChunk -> this.entityManager.updateTrackingStatus(worldChunk.getPos(), ChunkLevelType.ENTITY_TICKING));
+		NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.register(worldChunk -> server.executeSync(
+				() -> this.entityManager.updateTrackingStatus(worldChunk.getPos(), ChunkLevelType.ENTITY_TICKING)));
 	}
 
 	@Inject(method = "getPersistentStateManager", at = @At(value = "HEAD"), cancellable = true)

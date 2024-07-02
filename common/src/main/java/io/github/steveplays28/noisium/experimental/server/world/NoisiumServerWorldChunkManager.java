@@ -8,7 +8,7 @@ import io.github.steveplays28.noisium.Noisium;
 import io.github.steveplays28.noisium.experimental.extension.world.chunk.NoisiumWorldChunkExtension;
 import io.github.steveplays28.noisium.experimental.server.world.chunk.event.NoisiumServerChunkEvent;
 import io.github.steveplays28.noisium.experimental.util.world.chunk.ChunkUtil;
-import io.github.steveplays28.noisium.mixin.experimental.accessor.NoiseChunkGeneratorAccessor;
+import io.github.steveplays28.noisium.mixin.experimental.accessor.world.gen.chunk.ChunkGeneratorAccessor;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.EntityType;
 import net.minecraft.nbt.NbtCompound;
@@ -19,13 +19,11 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.*;
 import net.minecraft.world.chunk.*;
 import net.minecraft.world.gen.GenerationStep;
 import net.minecraft.world.gen.chunk.Blender;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
-import net.minecraft.world.gen.chunk.NoiseChunkGenerator;
 import net.minecraft.world.gen.noise.NoiseConfig;
 import net.minecraft.world.poi.PointOfInterestStorage;
 import net.minecraft.world.poi.PointOfInterestType;
@@ -56,6 +54,7 @@ public class NoisiumServerWorldChunkManager {
 	private final PointOfInterestStorage pointOfInterestStorage;
 	private final VersionedChunkStorage versionedChunkStorage;
 	private final Executor threadPoolExecutor;
+	private final Executor noisePopulationThreadPoolExecutor;
 	private final ConcurrentMap<ChunkPos, CompletableFuture<WorldChunk>> loadingWorldChunks;
 	private final Map<ChunkPos, WorldChunk> loadedWorldChunks;
 
@@ -72,8 +71,11 @@ public class NoisiumServerWorldChunkManager {
 				worldDirectoryPath.resolve("poi"), dataFixer, false, serverWorld.getRegistryManager(), serverWorld);
 		this.versionedChunkStorage = new VersionedChunkStorage(worldDirectoryPath.resolve("region"), dataFixer, false);
 		this.threadPoolExecutor = Executors.newFixedThreadPool(
-				4, new ThreadFactoryBuilder().setNameFormat(
+				2, new ThreadFactoryBuilder().setNameFormat(
 						"Noisium Server World Chunk Manager " + serverWorld.getDimension().effects() + " %d").build());
+		this.noisePopulationThreadPoolExecutor = Executors.newFixedThreadPool(
+				2, new ThreadFactoryBuilder().setNameFormat(
+						"Noisium Server World Chunk Manager Noise Population " + serverWorld.getDimension().effects() + " %d").build());
 		this.loadingWorldChunks = new ConcurrentHashMap<>();
 		this.loadedWorldChunks = new HashMap<>();
 
@@ -130,7 +132,7 @@ public class NoisiumServerWorldChunkManager {
 				return;
 			}
 
-			fetchedWorldChunk.addChunkTickSchedulers(serverWorld);
+			serverWorld.getServer().executeSync(() -> fetchedWorldChunk.addChunkTickSchedulers(serverWorld));
 			fetchedWorldChunk.loadEntities();
 			loadingWorldChunks.remove(chunkPos);
 			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
@@ -168,7 +170,7 @@ public class NoisiumServerWorldChunkManager {
 		var fetchedWorldChunk = new WorldChunk(serverWorld, fetchedChunk,
 				chunkToAddEntitiesTo -> serverWorld.addEntities(EntityType.streamFromNbt(fetchedChunk.getEntities(), serverWorld))
 		);
-		fetchedWorldChunk.addChunkTickSchedulers(serverWorld);
+		serverWorld.getServer().executeSync(() -> fetchedWorldChunk.addChunkTickSchedulers(serverWorld));
 		fetchedWorldChunk.loadEntities();
 		loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 		NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
@@ -330,17 +332,8 @@ public class NoisiumServerWorldChunkManager {
 		protoChunk.populateBiomes(chunkGenerator.getBiomeSource(), noiseConfig.getMultiNoiseSampler());
 
 		protoChunk.setStatus(ChunkStatus.NOISE);
-		// TODO: Remove the cast to NoiseChunkGenerator
-		//  Or add some other way to support any type of ChunkGenerator
-		var generationShapeConfig = ((NoiseChunkGenerator) chunkGenerator).getSettings().value().generationShapeConfig().trimHeight(
-				protoChunk.getHeightLimitView());
-		int minimumY = generationShapeConfig.minimumY();
-		int minimumCellY = MathHelper.floorDiv(minimumY, generationShapeConfig.verticalCellBlockCount());
-		int cellHeight = MathHelper.floorDiv(generationShapeConfig.height(), generationShapeConfig.verticalCellBlockCount());
-		// TODO: Remove the cast to NoiseChunkGeneratorAccessor
-		//  Or add some other way to support any type of ChunkGenerator
-		((NoiseChunkGeneratorAccessor) chunkGenerator).invokePopulateNoise(
-				blender, chunkRegionStructureAccessor, noiseConfig, protoChunk, minimumCellY, cellHeight);
+		((ChunkGeneratorAccessor) chunkGenerator).invokePopulateNoise(
+				noisePopulationThreadPoolExecutor, blender, noiseConfig, chunkRegionStructureAccessor, protoChunk).join();
 
 		protoChunk.setStatus(ChunkStatus.SURFACE);
 		chunkGenerator.buildSurface(chunkRegion, chunkRegionStructureAccessor, noiseConfig, protoChunk);

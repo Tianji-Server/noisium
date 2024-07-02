@@ -10,8 +10,8 @@
     "GenerationShapeConfigMixin",
     "NoiseChunkGeneratorMixin",
     "compat.lithium.LithiumNoiseChunkGeneratorMixin",
-    "experimental.accessor.NoiseChunkGeneratorAccessor",
     "experimental.accessor.server.network.SpawnLocatingAccessor",
+    "experimental.accessor.world.gen.chunk.ChunkGeneratorAccessor",
     "experimental.block.LichenGrowerGrowCheckerMixin",
     "experimental.server.MinecraftServerMixin",
     "experimental.server.network.ServerPlayerEntityMixin",
@@ -25,7 +25,8 @@
     "experimental.world.WorldMixin",
     "experimental.world.chunk.WorldChunkMixin",
     "experimental.world.gen.chunk.ChunkGeneratorMixin",
-    "experimental.world.gen.chunk.NoiseChunkGeneratorMixin"
+    "experimental.world.gen.chunk.NoiseChunkGeneratorMixin",
+    "experimental.world.gen.feature.OreFeatureMixin"
   ],
   "client": [
     "experimental.client.gui.hud.DebugHudMixin"
