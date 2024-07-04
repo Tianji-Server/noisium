@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `v2.2.1` - 04/07/2024
+
+### Changed
+
+- Moved an `@Inject` on `NoiseChunkGenerator#method_38332` to an `@Overwrite`
+    - This allows other mods, such as [ishland](https://github.com/ishland)'s mods, to change the `Executor` of
+      `NoiseChunkGenerator#populateNoise`'s `CompletableFuture`.
+
 ## `v2.2.0` - 21/06/2024
 
 ### Added
