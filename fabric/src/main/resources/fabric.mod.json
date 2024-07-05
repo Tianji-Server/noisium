@@ -39,7 +39,7 @@
     ]
   },
   "mixins": [
-    "${mod_namespace}-common.mixins.json"
+    "${mod_namespace}-common.mixins.json",
     "${mod_namespace}-fabric.mixins.json"
   ],
   "depends": {

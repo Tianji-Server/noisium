@@ -82,7 +82,7 @@ public class NoisiumServerWorldChunkManager {
 		NoisiumServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
 		NoisiumServerChunkEvent.BLOCK_CHANGE.register(this::onBlockChange);
 		TickEvent.SERVER_LEVEL_POST.register(instance -> {
-			if (!instance.equals(serverWorld)) {
+			if (!instance.equals(serverWorld) || instance.getPlayers().isEmpty()) {
 				return;
 			}
 
@@ -332,7 +332,7 @@ public class NoisiumServerWorldChunkManager {
 		protoChunk.populateBiomes(chunkGenerator.getBiomeSource(), noiseConfig.getMultiNoiseSampler());
 
 		protoChunk.setStatus(ChunkStatus.NOISE);
-		((ChunkGeneratorAccessor) chunkGenerator).invokePopulateNoise(
+		protoChunk = (ProtoChunk) ((ChunkGeneratorAccessor) chunkGenerator).invokePopulateNoise(
 				noisePopulationThreadPoolExecutor, blender, noiseConfig, chunkRegionStructureAccessor, protoChunk).join();
 
 		protoChunk.setStatus(ChunkStatus.SURFACE);
