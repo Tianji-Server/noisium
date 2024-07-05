@@ -9,20 +9,18 @@ import net.minecraft.world.gen.feature.OreFeatureConfig;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Overwrite;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.BitSet;
 
 import static net.minecraft.world.gen.feature.OreFeature.shouldPlace;
 
-@Mixin(OreFeature.class)
+@Mixin(value = OreFeature.class, priority = 500)
 public class OreFeatureMixin {
-	/**
-	 * @author Steveplays28
-	 * @reason
-	 */
-	@Overwrite
-	public boolean generateVeinPart(
+	@Inject(method = "generateVeinPart", at = @At(value = "HEAD"), cancellable = true)
+	public void noisium$generateVeinPartWithoutChunkSectionCache(
 			@NotNull StructureWorldAccess world,
 			@NotNull Random random,
 			@NotNull OreFeatureConfig config,
@@ -36,7 +34,8 @@ public class OreFeatureMixin {
 			int y,
 			int z,
 			int horizontalSize,
-			int verticalSize
+			int verticalSize,
+			CallbackInfoReturnable<Boolean> cir
 	) {
 		int i = 0;
 		BitSet bitSet = new BitSet(horizontalSize * verticalSize * horizontalSize);
@@ -137,6 +136,6 @@ public class OreFeatureMixin {
 			}
 		}
 
-		return i > 0;
+		cir.setReturnValue(i > 0);
 	}
 }
