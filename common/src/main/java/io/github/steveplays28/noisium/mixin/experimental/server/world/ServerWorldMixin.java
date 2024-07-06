@@ -98,8 +98,8 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 		noisium$serverWorldEntityManager = new NoisiumServerWorldEntityTracker(
 				packet -> PacketUtil.sendPacketToPlayers(serverWorld.getPlayers(), packet));
 		noisium$serverWorldPlayerChunkLoader = new NoisiumServerWorldPlayerChunkLoader(
-				serverWorld, noisium$serverWorldChunkManager::getChunkAsync, noisium$serverWorldChunkManager::unloadChunk,
-				server.getPlayerManager()::getViewDistance
+				serverWorld, noisium$serverWorldChunkManager::getChunksInRadiusAsync, noisium$serverWorldChunkManager::getChunkAsync,
+				noisium$serverWorldChunkManager::unloadChunk, server.getPlayerManager()::getViewDistance
 		);
 
 		// TODO: Redo the server entity manager entirely, in an event-based way

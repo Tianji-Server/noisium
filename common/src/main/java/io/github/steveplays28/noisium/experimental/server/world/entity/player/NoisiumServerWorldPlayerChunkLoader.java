@@ -13,11 +13,13 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.chunk.WorldChunk;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -31,7 +33,13 @@ public class NoisiumServerWorldPlayerChunkLoader {
 	private final @NotNull Executor threadPoolExecutor;
 	private final @NotNull Map<Integer, Vec3d> previousPlayerPositions;
 
-	public NoisiumServerWorldPlayerChunkLoader(@NotNull ServerWorld serverWorld, @NotNull Function<ChunkPos, CompletableFuture<WorldChunk>> worldChunkLoadFunction, @NotNull Consumer<ChunkPos> worldChunkUnloadConsumer, @NotNull Supplier<Integer> serverViewDistanceSupplier) {
+	public NoisiumServerWorldPlayerChunkLoader(
+			@NotNull ServerWorld serverWorld,
+			@NotNull BiFunction<ChunkPos, Integer, Map<ChunkPos, CompletableFuture<WorldChunk>>> worldChunksInRadiusLoadFunction,
+			@NotNull Function<ChunkPos, CompletableFuture<WorldChunk>> worldChunkLoadFunction,
+			@NotNull Consumer<ChunkPos> worldChunkUnloadConsumer,
+			@NotNull Supplier<Integer> serverViewDistanceSupplier
+	) {
 		this.serverWorld = serverWorld;
 		this.worldChunkLoadFunction = worldChunkLoadFunction;
 		this.worldChunkUnloadConsumer = worldChunkUnloadConsumer;
@@ -41,12 +49,24 @@ public class NoisiumServerWorldPlayerChunkLoader {
 				1, new ThreadFactoryBuilder().setNameFormat("Noisium Server Player Chunk Loader %d").build());
 		this.previousPlayerPositions = new HashMap<>();
 
-		// TODO: Send chunks to player on join
 		PlayerEvent.PLAYER_JOIN.register(player -> {
 			if (!player.getServerWorld().equals(serverWorld)) {
 				return;
 			}
 
+			@NotNull var playerBlockPosition = player.getBlockPos();
+			// Send new render distance center to the player asynchronously
+			CompletableFuture.runAsync(() -> player.networkHandler.sendPacket(
+					new ChunkRenderDistanceCenterS2CPacket(
+							ChunkSectionPos.getSectionCoord(playerBlockPosition.getX()),
+							ChunkSectionPos.getSectionCoord(playerBlockPosition.getZ())
+					)), threadPoolExecutor);
+			// Send chunks around the player to the player asynchronously
+			ChunkUtil.sendWorldChunksToPlayerAsync(
+					serverWorld,
+					new ArrayList<>(worldChunksInRadiusLoadFunction.apply(player.getChunkPos(), serverViewDistanceSupplier.get()).values()),
+					threadPoolExecutor
+			);
 			previousPlayerPositions.put(player.getId(), player.getPos());
 		});
 		PlayerEvent.PLAYER_QUIT.register(player -> previousPlayerPositions.remove(player.getId()));
@@ -76,14 +96,17 @@ public class NoisiumServerWorldPlayerChunkLoader {
 			}
 
 			// Send world chunks that should be loaded to the player asynchronously
-			@NotNull var previousPlayerBlockPos = new BlockPos(
-					Math.round((float) previousPlayerPos.getX()), Math.round((float) previousPlayerPos.getY()),
-					Math.round((float) previousPlayerPos.getZ())
-			);
 			@NotNull var previousPlayerChunkPositionsInServerViewDistance = ChunkUtil.getChunkPositionsAtPositionInRadius(
-					new ChunkPos(previousPlayerBlockPos), serverViewDistanceSupplier.get());
+					new ChunkPos(
+							new BlockPos(
+									Math.round((float) previousPlayerPos.getX()),
+									Math.round((float) previousPlayerPos.getY()),
+									Math.round((float) previousPlayerPos.getZ())
+							)
+					), serverViewDistanceSupplier.get()
+			);
 			@NotNull var playerChunkPositionsInServerViewDistance = ChunkUtil.getChunkPositionsAtPositionInRadius(
-					new ChunkPos(playerBlockPos), serverViewDistanceSupplier.get());
+					player.getChunkPos(), serverViewDistanceSupplier.get());
 			@NotNull final var chunkPositionsToLoad = ChunkUtil.getChunkPositionDifferences(
 					playerChunkPositionsInServerViewDistance, previousPlayerChunkPositionsInServerViewDistance);
 			for (int chunkPositionsToLoadIndex = 0; chunkPositionsToLoadIndex < chunkPositionsToLoad.size(); chunkPositionsToLoadIndex++) {
