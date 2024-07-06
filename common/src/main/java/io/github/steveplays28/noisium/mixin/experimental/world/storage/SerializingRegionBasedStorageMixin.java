@@ -18,7 +18,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-@Mixin(value = SerializingRegionBasedStorage.class, remap = false)
+@Mixin(SerializingRegionBasedStorage.class)
 public abstract class SerializingRegionBasedStorageMixin<R> {
 	@Shadow
 	protected abstract void onUpdate(long pos);
