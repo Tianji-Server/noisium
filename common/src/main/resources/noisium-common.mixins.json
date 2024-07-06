@@ -26,7 +26,8 @@
     "experimental.world.chunk.WorldChunkMixin",
     "experimental.world.gen.chunk.ChunkGeneratorMixin",
     "experimental.world.gen.chunk.NoiseChunkGeneratorMixin",
-    "experimental.world.gen.feature.OreFeatureMixin"
+    "experimental.world.gen.feature.OreFeatureMixin",
+    "experimental.world.storage.SerializingRegionBasedStorageMixin"
   ],
   "client": [
     "experimental.client.gui.hud.DebugHudMixin"
