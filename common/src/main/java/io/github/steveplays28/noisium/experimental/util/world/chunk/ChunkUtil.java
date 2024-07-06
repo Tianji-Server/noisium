@@ -15,6 +15,7 @@ import net.minecraft.world.chunk.light.LightingProvider;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -23,6 +24,7 @@ import java.util.concurrent.Executor;
 public class ChunkUtil {
 	/**
 	 * Sends a {@link WorldChunk} to all players in the specified world.
+	 * WARNING: This method blocks the server thread. Prefer using {@link ChunkUtil#sendWorldChunkToPlayerAsync(ServerWorld, CompletableFuture, Executor)} instead.
 	 *
 	 * @param serverWorld The world the {@link WorldChunk} resides in.
 	 * @param worldChunk  The {@link WorldChunk}.
@@ -39,6 +41,17 @@ public class ChunkUtil {
 					ExceptionUtils.getStackTrace(e)
 			);
 		}
+	}
+
+	/**
+	 * Sends a {@link WorldChunk} to all players in the specified world.
+	 * This method is ran asynchronously.
+	 *
+	 * @param serverWorld      The world the {@link WorldChunk} resides in.
+	 * @param worldChunkFuture The {@link CompletableFuture<WorldChunk>}.
+	 */
+	public static void sendWorldChunkToPlayerAsync(@NotNull ServerWorld serverWorld, @NotNull CompletableFuture<WorldChunk> worldChunkFuture, @NotNull Executor executor) {
+		worldChunkFuture.whenCompleteAsync((worldChunk, throwable) -> sendWorldChunkToPlayer(serverWorld, worldChunk), executor);
 	}
 
 	/**
@@ -100,5 +113,31 @@ public class ChunkUtil {
 		for (int i = 0; i < players.size(); i++) {
 			players.get(i).networkHandler.sendPacket(new BlockUpdateS2CPacket(blockPos, blockState));
 		}
+	}
+
+	public static @NotNull List<ChunkPos> getChunkPositionsAtPositionInRadius(@NotNull ChunkPos chunkPosition, int radius) {
+		@NotNull final List<ChunkPos> chunkPositions = new ArrayList<>();
+		for (int chunkPositionX = chunkPosition.x - radius; chunkPositionX < chunkPosition.x + radius; chunkPositionX++) {
+			for (int chunkPositionZ = chunkPosition.z - radius; chunkPositionZ < chunkPosition.z + radius; chunkPositionZ++) {
+				chunkPositions.add(new ChunkPos(chunkPositionX, chunkPositionZ));
+			}
+		}
+
+		return chunkPositions;
+	}
+
+	/**
+	 * @param chunkPositions      A {@link List} of {@link ChunkPos}s.
+	 * @param otherChunkPositions Another {@link List} of {@link ChunkPos}s.
+	 * @return The {@link ChunkPos}s that are in {@code chunkPositions}, but not in {@code otherChunkPositions}.
+	 */
+	@SuppressWarnings("ForLoopReplaceableByForEach")
+	public static @NotNull List<ChunkPos> getChunkPositionDifferences(@NotNull List<ChunkPos> chunkPositions, @NotNull List<ChunkPos> otherChunkPositions) {
+		@NotNull final List<ChunkPos> chunkPositionDifferences = new ArrayList<>(chunkPositions);
+		for (int i = 0; i < otherChunkPositions.size(); i++) {
+			chunkPositionDifferences.remove(otherChunkPositions.get(i));
+		}
+
+		return chunkPositionDifferences;
 	}
 }

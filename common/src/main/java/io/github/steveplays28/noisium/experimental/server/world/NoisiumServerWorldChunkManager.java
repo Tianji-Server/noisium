@@ -38,6 +38,8 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 
+import static io.github.steveplays28.noisium.Noisium.MOD_NAME;
+
 /**
  * A chunk manager for {@link ServerWorld}s.
  * This class cannot extend {@link net.minecraft.server.world.ServerChunkManager} or {@link ChunkManager} due to {@link ServerWorld}s requiring an implementation of {@link net.minecraft.server.world.ServerChunkManager}, which would slow the chunk manager down.
@@ -46,6 +48,7 @@ import java.util.concurrent.*;
 //  The check needs to be changed to point to the server world's isChunkLoaded() method
 // TODO: Implement chunk ticking
 // TODO: Save all chunks when save event is called
+// TODO: Make SerializingRegionBasedStorage#loadedElements thread-safe
 public class NoisiumServerWorldChunkManager {
 	private final ServerWorld serverWorld;
 	private final ChunkGenerator chunkGenerator;
@@ -55,8 +58,11 @@ public class NoisiumServerWorldChunkManager {
 	private final VersionedChunkStorage versionedChunkStorage;
 	private final Executor threadPoolExecutor;
 	private final Executor noisePopulationThreadPoolExecutor;
+	private final Executor lightingThreadPoolExecutor;
 	private final ConcurrentMap<ChunkPos, CompletableFuture<WorldChunk>> loadingWorldChunks;
 	private final Map<ChunkPos, WorldChunk> loadedWorldChunks;
+
+	private boolean isStopping;
 
 	@SuppressWarnings("ResultOfMethodCallIgnored")
 	public NoisiumServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull NoiseConfig noiseConfig, @NotNull Path worldDirectoryPath, DataFixer dataFixer) {
@@ -71,11 +77,14 @@ public class NoisiumServerWorldChunkManager {
 				worldDirectoryPath.resolve("poi"), dataFixer, false, serverWorld.getRegistryManager(), serverWorld);
 		this.versionedChunkStorage = new VersionedChunkStorage(worldDirectoryPath.resolve("region"), dataFixer, false);
 		this.threadPoolExecutor = Executors.newFixedThreadPool(
-				2, new ThreadFactoryBuilder().setNameFormat(
+				4, new ThreadFactoryBuilder().setNameFormat(
 						"Noisium Server World Chunk Manager " + serverWorld.getDimension().effects() + " %d").build());
 		this.noisePopulationThreadPoolExecutor = Executors.newFixedThreadPool(
 				2, new ThreadFactoryBuilder().setNameFormat(
 						"Noisium Server World Chunk Manager Noise Population " + serverWorld.getDimension().effects() + " %d").build());
+		this.lightingThreadPoolExecutor = Executors.newFixedThreadPool(
+				2, new ThreadFactoryBuilder().setNameFormat(
+						"Noisium Server World Chunk Manager Lighting " + serverWorld.getDimension().effects() + " %d").build());
 		this.loadingWorldChunks = new ConcurrentHashMap<>();
 		this.loadedWorldChunks = new HashMap<>();
 
@@ -90,10 +99,14 @@ public class NoisiumServerWorldChunkManager {
 			pointOfInterestStorage.tick(() -> true);
 		});
 		LifecycleEvent.SERVER_STOPPING.register(instance -> {
+			this.isStopping = true;
+			((ServerLightingProvider) serverWorld.getLightingProvider()).close();
 			for (var loadingWorldChunkCompletableFuture : loadingWorldChunks.values()) {
 				loadingWorldChunkCompletableFuture.cancel(true);
 			}
-			((ServerLightingProvider) serverWorld.getLightingProvider()).close();
+
+			loadingWorldChunks.clear();
+			loadedWorldChunks.clear();
 		});
 	}
 
@@ -106,6 +119,11 @@ public class NoisiumServerWorldChunkManager {
 	 * @return The loaded chunk.
 	 */
 	public @NotNull CompletableFuture<WorldChunk> getChunkAsync(ChunkPos chunkPos) {
+		if (isStopping) {
+			return CompletableFuture.failedFuture(new IllegalStateException(
+					String.format("Can't get chunk because %s Server World Chunk Manager is stopping.", MOD_NAME)));
+		}
+
 		if (loadedWorldChunks.containsKey(chunkPos)) {
 			return CompletableFuture.completedFuture(loadedWorldChunks.get(chunkPos));
 		} else if (loadingWorldChunks.containsKey(chunkPos)) {
@@ -151,6 +169,10 @@ public class NoisiumServerWorldChunkManager {
 	 * @return The loaded {@link WorldChunk}.
 	 */
 	public @NotNull WorldChunk getChunk(ChunkPos chunkPos) {
+		if (isStopping) {
+			throw new IllegalStateException(String.format("Can't get chunk because %s Server World Chunk Manager is stopping.", MOD_NAME));
+		}
+
 		if (loadedWorldChunks.containsKey(chunkPos)) {
 			return loadedWorldChunks.get(chunkPos);
 		} else if (loadingWorldChunks.containsKey(chunkPos)) {
@@ -219,6 +241,14 @@ public class NoisiumServerWorldChunkManager {
 		return chunks;
 	}
 
+	public void unloadChunk(@NotNull ChunkPos chunkPosition) {
+		if (loadingWorldChunks.containsKey(chunkPosition)) {
+			loadingWorldChunks.get(chunkPosition).whenComplete((chunk, throwable) -> loadedWorldChunks.remove(chunkPosition));
+		}
+
+		loadedWorldChunks.remove(chunkPosition);
+	}
+
 	public boolean isChunkLoaded(ChunkPos chunkPos) {
 		return this.loadedWorldChunks.containsKey(chunkPos);
 	}
@@ -263,7 +293,7 @@ public class NoisiumServerWorldChunkManager {
 				blockLightBits.set(chunkSectionYPositionDifference);
 			}
 			ChunkUtil.sendLightUpdateToPlayers(serverWorld.getPlayers(), lightingProvider, chunkPosition, skyLightBits, blockLightBits);
-		}, threadPoolExecutor);
+		}, lightingThreadPoolExecutor);
 	}
 
 	// TODO: Check if this can be ran asynchronously

@@ -2,6 +2,7 @@ package io.github.steveplays28.noisium.mixin.experimental.server.world;
 
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.datafixers.DataFixer;
+import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import io.github.steveplays28.noisium.experimental.extension.world.server.NoisiumServerWorldExtension;
 import io.github.steveplays28.noisium.experimental.server.world.NoisiumServerWorldChunkManager;
@@ -54,6 +55,9 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 	@Shadow
 	public abstract void tickEntity(Entity entity);
 
+	@Shadow
+	public abstract @NotNull MinecraftServer getServer();
+
 	@Unique
 	private NoiseConfig noisium$noiseConfig;
 	/**
@@ -94,7 +98,9 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 		noisium$serverWorldEntityManager = new NoisiumServerWorldEntityTracker(
 				packet -> PacketUtil.sendPacketToPlayers(serverWorld.getPlayers(), packet));
 		noisium$serverWorldPlayerChunkLoader = new NoisiumServerWorldPlayerChunkLoader(
-				serverWorld, ((NoisiumServerWorldExtension) serverWorld).noisium$getServerWorldChunkManager()::getChunksInRadiusAsync);
+				serverWorld, noisium$serverWorldChunkManager::getChunkAsync, noisium$serverWorldChunkManager::unloadChunk,
+				server.getPlayerManager()::getViewDistance
+		);
 
 		// TODO: Redo the server entity manager entirely, in an event-based way
 		//  Also remove this line when that's done, since this doesn't belong here
@@ -111,6 +117,12 @@ public abstract class ServerWorldMixin implements NoisiumServerWorldExtension {
 		//  More efficient methods can be used when registering the event listener directly in the server entity manager
 		NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.register(worldChunk -> server.executeSync(
 				() -> this.entityManager.updateTrackingStatus(worldChunk.getPos(), ChunkLevelType.ENTITY_TICKING)));
+		LifecycleEvent.SERVER_STOPPED.register(instance -> {
+			noisium$serverWorldPlayerChunkLoader = null;
+			noisium$serverWorldEntityManager = null;
+			noisium$serverWorldChunkManager = null;
+			noisium$noiseConfig = null;
+		});
 	}
 
 	@Inject(method = "getPersistentStateManager", at = @At(value = "HEAD"), cancellable = true)

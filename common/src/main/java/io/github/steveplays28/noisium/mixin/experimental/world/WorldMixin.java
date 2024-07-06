@@ -1,10 +1,13 @@
 package io.github.steveplays28.noisium.mixin.experimental.world;
 
 import io.github.steveplays28.noisium.experimental.extension.world.server.NoisiumServerWorldExtension;
+import io.github.steveplays28.noisium.experimental.world.chunk.IoWorldChunk;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.fluid.Fluids;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
@@ -31,7 +34,13 @@ public abstract class WorldMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(null);
+			if (!(((World) (Object) this) instanceof @NotNull ServerWorld serverWorld)) {
+				cir.setReturnValue(null);
+				return;
+			}
+
+			cir.setReturnValue(
+					new IoWorldChunk(chunkPosition, serverWorld, serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null));
 			return;
 		}
 
