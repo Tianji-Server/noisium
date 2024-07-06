@@ -6,8 +6,6 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.fluid.Fluids;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
@@ -26,7 +24,7 @@ public abstract class WorldMixin {
 	public abstract boolean isClient();
 
 	@Inject(method = "getChunk(IILnet/minecraft/world/chunk/ChunkStatus;Z)Lnet/minecraft/world/chunk/Chunk;", at = @At(value = "HEAD"), cancellable = true)
-	private void noisium$getChunkFromNoisiumServerChunkManager(int chunkX, int chunkZ, ChunkStatus leastStatus, boolean create, CallbackInfoReturnable<Chunk> cir) {
+	private void noisium$getChunkFromNoisiumServerChunkManager(int chunkX, int chunkZ, @NotNull ChunkStatus leastStatus, boolean create, @NotNull CallbackInfoReturnable<Chunk> cir) {
 		if (this.isClient()) {
 			return;
 		}
@@ -34,13 +32,7 @@ public abstract class WorldMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			if (!(((World) (Object) this) instanceof @NotNull ServerWorld serverWorld)) {
-				cir.setReturnValue(null);
-				return;
-			}
-
-			cir.setReturnValue(
-					new IoWorldChunk(chunkPosition, serverWorld, serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null));
+			cir.setReturnValue(new IoWorldChunk((World) (Object) this, chunkPosition));
 			return;
 		}
 

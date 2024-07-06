@@ -7,6 +7,7 @@ import net.minecraft.client.gui.hud.DebugHud;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.chunk.WorldChunk;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -27,14 +28,19 @@ public abstract class DebugHudMixin {
 
 	@Inject(method = "getChunk", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$getChunkFromNoisiumServerWorldChunkManager(CallbackInfoReturnable<WorldChunk> cir) {
-		var serverWorld = this.getServerWorld();
-		var playerPosition = this.pos;
-		if (serverWorld == null || playerPosition == null) {
+		@Nullable var serverWorld = this.getServerWorld();
+		@Nullable var playerChunkPosition = this.pos;
+		if (serverWorld == null || playerChunkPosition == null) {
 			cir.setReturnValue(null);
 			return;
 		}
 
-		((NoisiumServerWorldExtension) serverWorld).noisium$getServerWorldChunkManager().getChunkAsync(
-				new ChunkPos(playerPosition.x, playerPosition.z)).whenComplete((worldChunk, throwable) -> cir.setReturnValue(worldChunk));
+		@NotNull var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) serverWorld).noisium$getServerWorldChunkManager();
+		if (!noisiumServerWorldChunkManager.isChunkLoaded(playerChunkPosition)) {
+			cir.setReturnValue(null);
+			return;
+		}
+
+		noisiumServerWorldChunkManager.getChunk(playerChunkPosition);
 	}
 }

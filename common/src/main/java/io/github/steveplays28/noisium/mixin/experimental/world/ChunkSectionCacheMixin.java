@@ -1,6 +1,9 @@
 package io.github.steveplays28.noisium.mixin.experimental.world;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.ChunkSectionCache;
 import net.minecraft.world.WorldAccess;
@@ -19,10 +22,18 @@ public class ChunkSectionCacheMixin {
 	@Final
 	private @NotNull WorldAccess world;
 
+	@Shadow
+	@Final
+	private Long2ObjectMap<ChunkSection> cache;
+
 	@Inject(method = "getSection", at = @At(value = "HEAD"), cancellable = true)
-	private void noisium$returnNullIfChunkIsUnloaded(@NotNull BlockPos blockPos, @NotNull CallbackInfoReturnable<ChunkSection> cir) {
+	private void noisium$returnEmptyChunkSectionIfChunkIsUnloaded(@NotNull BlockPos blockPos, @NotNull CallbackInfoReturnable<ChunkSection> cir) {
 		if (!world.isChunkLoaded(ChunkSectionPos.getSectionCoord(blockPos.getX()), ChunkSectionPos.getSectionCoord(blockPos.getZ()))) {
-			cir.setReturnValue(null);
+			// TODO: Get an IoWorldChunk from NoisiumServerWorldChunkManager instead
+			//  Get a World by checking if (world instanceof World worldCasted)
+			cir.setReturnValue(this.cache.computeIfAbsent(new ChunkPos(blockPos).toLong(),
+					l -> new ChunkSection(world.getRegistryManager().get(RegistryKeys.BIOME))
+			));
 		}
 	}
 }

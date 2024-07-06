@@ -3,11 +3,10 @@ package io.github.steveplays28.noisium.mixin.experimental.world;
 import io.github.steveplays28.noisium.experimental.world.chunk.IoWorldChunk;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
-import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.fluid.Fluids;
 import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.RegistryKeys;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -47,11 +46,11 @@ public abstract class ChunkRegionMixin implements StructureWorldAccess {
 	private int width;
 
 	@Shadow
-	@Final
-	private @NotNull Chunk centerPos;
+	public abstract @NotNull DynamicRegistryManager getRegistryManager();
 
 	@Shadow
-	public abstract @NotNull DynamicRegistryManager getRegistryManager();
+	@Final
+	private ServerWorld world;
 
 	@Inject(method = "needsBlending", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$cancelBlending(@NotNull ChunkPos chunkPosition, int checkRadius, @NotNull CallbackInfoReturnable<Boolean> cir) {
@@ -61,12 +60,8 @@ public abstract class ChunkRegionMixin implements StructureWorldAccess {
 
 	@Inject(method = "getChunk(IILnet/minecraft/world/chunk/ChunkStatus;Z)Lnet/minecraft/world/chunk/Chunk;", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$getChunkReturnIoChunkIfChunkIsUnloaded(int chunkPositionX, int chunkPositionZ, @NotNull ChunkStatus leastStatus, boolean create, @NotNull CallbackInfoReturnable<Chunk> cir) {
-		// TODO: Return a chunk that can modify the save data instead of returning null
 		if (!this.isChunkLoaded(chunkPositionX, chunkPositionZ)) {
-			@NotNull final var centerChunk = this.centerPos;
-			cir.setReturnValue(new IoWorldChunk(new ChunkPos(chunkPositionX, chunkPositionZ), centerChunk.getHeightLimitView(),
-					this.getRegistryManager().get(RegistryKeys.BIOME), centerChunk.getBlendingData()
-			));
+			cir.setReturnValue(new IoWorldChunk(this.world, new ChunkPos(chunkPositionX, chunkPositionZ)));
 			return;
 		}
 
@@ -99,13 +94,6 @@ public abstract class ChunkRegionMixin implements StructureWorldAccess {
 	private void noisium$getTopYReturnSeaLevelIfChunkIsUnloaded(@NotNull Heightmap.Type heightmap, int blockPositionX, int blockPositionZ, @NotNull CallbackInfoReturnable<Integer> cir) {
 		if (!this.isChunkLoaded(ChunkSectionPos.getSectionCoord(blockPositionX), ChunkSectionPos.getSectionCoord(blockPositionZ))) {
 			cir.setReturnValue(this.getSeaLevel());
-		}
-	}
-
-	@Inject(method = "getBlockEntity", at = @At(value = "HEAD"), cancellable = true)
-	private void noisium$returnEmptyBlockEntityIfChunkIsUnloaded(@NotNull BlockPos blockPos, @NotNull CallbackInfoReturnable<BlockEntity> cir) {
-		if (!this.isChunkLoaded(ChunkSectionPos.getSectionCoord(blockPos.getX()), ChunkSectionPos.getSectionCoord(blockPos.getZ()))) {
-			cir.setReturnValue(null);
 		}
 	}
 }
