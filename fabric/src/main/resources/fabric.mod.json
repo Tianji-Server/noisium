@@ -29,7 +29,8 @@
       "modrinth": "${modrinth_project_id}"
     },
     "lithium:options": {
-      "world.inline_block_access": false
+      "world.inline_block_access": false,
+      "gen.chunk_region": false
     }
   },
   "environment": "*",
