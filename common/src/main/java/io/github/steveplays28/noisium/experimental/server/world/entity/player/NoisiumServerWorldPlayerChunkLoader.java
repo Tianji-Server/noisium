@@ -12,6 +12,7 @@ import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.chunk.WorldChunk;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -90,8 +91,8 @@ public class NoisiumServerWorldPlayerChunkLoader {
 		for (int i = 0; i < players.size(); i++) {
 			@NotNull var player = players.get(i);
 			@NotNull var playerBlockPos = player.getBlockPos();
-			@NotNull var previousPlayerPos = previousPlayerPositions.get(player.getId());
-			if (playerBlockPos.isWithinDistance(previousPlayerPos, 16d)) {
+			@Nullable var previousPlayerPos = previousPlayerPositions.get(player.getId());
+			if (previousPlayerPos == null || playerBlockPos.isWithinDistance(previousPlayerPos, 16d)) {
 				continue;
 			}
 
