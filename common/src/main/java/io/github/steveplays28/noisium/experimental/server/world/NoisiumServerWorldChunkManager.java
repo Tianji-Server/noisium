@@ -10,6 +10,8 @@ import io.github.steveplays28.noisium.experimental.server.world.chunk.event.Nois
 import io.github.steveplays28.noisium.experimental.util.world.chunk.ChunkUtil;
 import io.github.steveplays28.noisium.experimental.world.chunk.IoWorldChunk;
 import io.github.steveplays28.noisium.mixin.experimental.accessor.util.collection.PackedIntegerArrayAccessor;
+import io.github.steveplays28.noisium.mixin.experimental.accessor.util.thread.LockHelperAccessor;
+import io.github.steveplays28.noisium.mixin.experimental.accessor.world.chunk.PalettedContainerAccessor;
 import io.github.steveplays28.noisium.mixin.experimental.accessor.world.gen.chunk.ChunkGeneratorAccessor;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -349,13 +351,11 @@ public class NoisiumServerWorldChunkManager {
 	}
 
 	// TODO: Move this into the constructor as a Supplier<ChunkPos, ProtoChunk>
-	@SuppressWarnings("ForLoopReplaceableByForEach")
 	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkGetFunction, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkRemoveFunction) {
 		var serverLightingProvider = (ServerLightingProvider) serverWorld.getLightingProvider();
 		var protoChunk = new ProtoChunk(chunkPos, UpgradeData.NO_UPGRADE_DATA, serverWorld,
 				serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null
 		);
-		// TODO: Fix Minecraft so it can generate 1 chunk at a time
 		List<Chunk> chunkRegionChunks = List.of(protoChunk);
 		var chunkRegion = new ChunkRegion(serverWorld, chunkRegionChunks, ChunkStatus.FULL, 1);
 		var blender = Blender.getBlender(chunkRegion);
@@ -410,9 +410,19 @@ public class NoisiumServerWorldChunkManager {
 				continue;
 			}
 
-			@NotNull var protoChunkPalettedContainerData = protoChunk.getSectionArray()[chunkSectionIndex].getBlockStateContainer().data;
+			@NotNull var ioWorldChunkSectionBlockStateContainer = ioWorldChunkSection.getBlockStateContainer();
+			@NotNull var ioWorldChunkSectionLockHelper = ((LockHelperAccessor) ((PalettedContainerAccessor) ioWorldChunkSectionBlockStateContainer).getLockHelper());
+			@NotNull var ioWorldChunkSectionLock = ioWorldChunkSectionLockHelper.getLock();
+			ioWorldChunkSectionLock.lock();
+
+			@NotNull var protoChunkSectionBlockStateContainer = protoChunk.getSectionArray()[chunkSectionIndex].getBlockStateContainer();
+			@NotNull var protoChunkSectionLockHelper = ((LockHelperAccessor) ((PalettedContainerAccessor) protoChunkSectionBlockStateContainer).getLockHelper());
+			@NotNull var protoChunkSectionLock = protoChunkSectionLockHelper.getLock();
+			protoChunkSectionLock.lock();
+
+			@NotNull var protoChunkPalettedContainerData = protoChunkSectionBlockStateContainer.data;
 			@NotNull var protoChunkPaletteStorage = protoChunkPalettedContainerData.storage();
-			@NotNull var ioWorldChunkPalettedContainerData = ioWorldChunkSection.getBlockStateContainer().data;
+			@NotNull var ioWorldChunkPalettedContainerData = ioWorldChunkSectionBlockStateContainer.data;
 			@NotNull var ioWorldChunkPaletteStorage = ioWorldChunkPalettedContainerData.storage();
 			var ioWorldChunkPaletteStorageSize = ioWorldChunkPaletteStorage.getSize();
 			if (protoChunkPaletteStorage.getData().length == 0) {
@@ -423,12 +433,19 @@ public class NoisiumServerWorldChunkManager {
 			for (int blockIndex = 0; blockIndex < ioWorldChunkPaletteStorageSize; blockIndex++) {
 				@NotNull var blockState = ioWorldChunkPalettedContainerData.palette().get(ioWorldChunkPaletteStorage.get(blockIndex));
 				var blockStatePaletteValue = protoChunkPalettedContainerData.palette.index(blockState);
-				if (blockState.equals(Blocks.AIR.getDefaultState()) || blockStatePaletteValue > ((PackedIntegerArrayAccessor) protoChunkPaletteStorage).getMaxValue()) {
+				if (blockState.equals(Blocks.AIR.getDefaultState())
+						|| blockStatePaletteValue > ((PackedIntegerArrayAccessor) protoChunkPaletteStorage).getMaxValue()) {
 					continue;
 				}
 
 				protoChunkPaletteStorage.set(blockIndex, blockStatePaletteValue);
 			}
+
+
+			ioWorldChunkSectionLockHelper.setThread(null);
+			ioWorldChunkSectionLock.unlock();
+			protoChunkSectionLockHelper.setThread(null);
+			protoChunkSectionLock.unlock();
 		}
 
 		ioWorldChunkRemoveFunction.apply(chunkPos);
