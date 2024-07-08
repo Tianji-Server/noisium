@@ -5,6 +5,7 @@ import io.github.steveplays28.noisium.experimental.extension.world.server.Noisiu
 import io.github.steveplays28.noisium.experimental.server.world.chunk.event.NoisiumServerChunkEvent;
 import io.github.steveplays28.noisium.experimental.server.world.event.NoisiumServerTickEvent;
 import io.github.steveplays28.noisium.experimental.util.world.chunk.networking.packet.PacketUtil;
+import io.github.steveplays28.noisium.experimental.world.chunk.IoWorldChunk;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
@@ -98,7 +99,7 @@ public abstract class ServerChunkManagerMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(noisiumServerWorldChunkManager.getNewIoWorldChunk(chunkPosition));
+			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
 			return;
 		}
 
@@ -110,7 +111,7 @@ public abstract class ServerChunkManagerMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(noisiumServerWorldChunkManager.getNewIoWorldChunk(chunkPosition));
+			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
 			return;
 		}
 
@@ -122,7 +123,7 @@ public abstract class ServerChunkManagerMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(noisiumServerWorldChunkManager.getNewIoWorldChunk(chunkPosition));
+			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
 			return;
 		}
 

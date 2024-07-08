@@ -1,8 +1,11 @@
 package io.github.steveplays28.noisium.mixin.experimental.world;
 
 import io.github.steveplays28.noisium.experimental.extension.world.server.NoisiumServerWorldExtension;
+import io.github.steveplays28.noisium.experimental.world.chunk.IoWorldChunk;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.fluid.FluidState;
+import net.minecraft.fluid.Fluids;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
@@ -29,7 +32,7 @@ public abstract class WorldMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkPositionX, chunkPositionZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(noisiumServerWorldChunkManager.getNewIoWorldChunk(chunkPosition));
+			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
 			return;
 		}
 
@@ -45,7 +48,7 @@ public abstract class WorldMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(blockPosition);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(noisiumServerWorldChunkManager.getNewIoWorldChunk(chunkPosition).getBlockState(blockPosition));
+			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition).getBlockState(blockPosition));
 			return;
 		}
 
@@ -61,7 +64,7 @@ public abstract class WorldMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(blockPosition);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(noisiumServerWorldChunkManager.getNewIoWorldChunk(chunkPosition).getFluidState(blockPosition));
+			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition).getFluidState(blockPosition));
 			return;
 		}
 
