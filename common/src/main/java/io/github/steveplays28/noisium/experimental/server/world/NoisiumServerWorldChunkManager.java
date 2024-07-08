@@ -1,5 +1,8 @@
 package io.github.steveplays28.noisium.experimental.server.world;
 
+import com.google.common.collect.Multimap;
+import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.Multimaps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.mojang.datafixers.DataFixer;
 import dev.architectury.event.events.common.LifecycleEvent;
@@ -41,6 +44,7 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static io.github.steveplays28.noisium.Noisium.MOD_NAME;
@@ -64,7 +68,7 @@ public class NoisiumServerWorldChunkManager {
 	private final Executor noisePopulationThreadPoolExecutor;
 	private final Executor lightingThreadPoolExecutor;
 	private final ConcurrentMap<ChunkPos, CompletableFuture<WorldChunk>> loadingWorldChunks;
-	private final ConcurrentMap<ChunkPos, IoWorldChunk> ioWorldChunks;
+	private final Multimap<ChunkPos, IoWorldChunk> ioWorldChunks;
 	private final Map<ChunkPos, WorldChunk> loadedWorldChunks;
 
 	private boolean isStopping;
@@ -91,7 +95,7 @@ public class NoisiumServerWorldChunkManager {
 				2, new ThreadFactoryBuilder().setNameFormat(
 						"Noisium Server World Chunk Manager Lighting " + serverWorld.getDimension().effects() + " %d").build());
 		this.loadingWorldChunks = new ConcurrentHashMap<>();
-		this.ioWorldChunks = new ConcurrentHashMap<>();
+		this.ioWorldChunks = Multimaps.synchronizedMultimap(MultimapBuilder.hashKeys().hashSetValues().build());
 		this.loadedWorldChunks = new HashMap<>();
 
 		NoisiumServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
@@ -140,7 +144,7 @@ public class NoisiumServerWorldChunkManager {
 			var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 			if (fetchedNbtData == null) {
 				// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
-				return new WorldChunk(serverWorld, generateChunk(chunkPos, this::getIoWorldChunk, ioWorldChunks::remove), null);
+				return new WorldChunk(serverWorld, generateChunk(chunkPos, ioWorldChunks::get, ioWorldChunks::removeAll), null);
 			}
 
 			versionedChunkStorage.updateChunkNbt(
@@ -189,7 +193,7 @@ public class NoisiumServerWorldChunkManager {
 		if (fetchedNbtData == null) {
 			// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
 			var fetchedWorldChunk = new WorldChunk(
-					serverWorld, generateChunk(chunkPos, this::getIoWorldChunk, ioWorldChunks::remove), null);
+					serverWorld, generateChunk(chunkPos, ioWorldChunks::get, ioWorldChunks::removeAll), null);
 			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 			NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 			return fetchedWorldChunk;
@@ -206,11 +210,14 @@ public class NoisiumServerWorldChunkManager {
 		return fetchedWorldChunk;
 	}
 
-	public @NotNull IoWorldChunk getIoWorldChunk(@NotNull ChunkPos chunkPos) {
-		if (ioWorldChunks.containsKey(chunkPos)) {
-			return ioWorldChunks.get(chunkPos);
-		}
-
+	/**
+	 * Gets a new {@link IoWorldChunk} that will only be used for this method chain.
+	 * This {@link IoWorldChunk} will be merged into the {@link WorldChunk} at the same {@link ChunkPos} during one of the last steps of world generation.
+	 *
+	 * @param chunkPos The position of the {@link IoWorldChunk}.
+	 * @return A new {@link IoWorldChunk} that will only be used for this method chain.
+	 */
+	public @NotNull IoWorldChunk getNewIoWorldChunk(@NotNull ChunkPos chunkPos) {
 		@NotNull var ioWorldChunk = new IoWorldChunk(serverWorld, chunkPos);
 		ioWorldChunks.put(chunkPos, ioWorldChunk);
 		return ioWorldChunk;
@@ -349,8 +356,7 @@ public class NoisiumServerWorldChunkManager {
 	}
 
 	// TODO: Move this into the constructor as a Supplier<ChunkPos, ProtoChunk>
-	@SuppressWarnings("ForLoopReplaceableByForEach")
-	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkGetFunction, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkRemoveFunction) {
+	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos, @NotNull Function<ChunkPos, Collection<IoWorldChunk>> ioWorldChunkGetFunction, @NotNull Consumer<ChunkPos> ioWorldChunksRemoveConsumer) {
 		var serverLightingProvider = (ServerLightingProvider) serverWorld.getLightingProvider();
 		var protoChunk = new ProtoChunk(chunkPos, UpgradeData.NO_UPGRADE_DATA, serverWorld,
 				serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null
@@ -403,35 +409,40 @@ public class NoisiumServerWorldChunkManager {
 		chunkGenerator.generateFeatures(chunkRegion, protoChunk, chunkRegionStructureAccessor);
 		Blender.tickLeavesAndFluids(chunkRegion, protoChunk);
 
-		@NotNull var ioWorldChunkSectionArray = ioWorldChunkGetFunction.apply(chunkPos).getSectionArray();
-		for (int chunkSectionIndex = 0; chunkSectionIndex < ioWorldChunkSectionArray.length; chunkSectionIndex++) {
-			@NotNull var ioWorldChunkSection = ioWorldChunkSectionArray[chunkSectionIndex];
-			if (ioWorldChunkSection.isEmpty()) {
-				continue;
-			}
+		@NotNull var ioWorldChunks = ioWorldChunkGetFunction.apply(chunkPos);
+		synchronized (ioWorldChunks) {
+			for (@NotNull IoWorldChunk ioWorldChunk : ioWorldChunks) {
+				@NotNull var ioWorldChunkSectionArray = ioWorldChunk.getSectionArray();
+				for (int chunkSectionIndex = 0; chunkSectionIndex < ioWorldChunkSectionArray.length; chunkSectionIndex++) {
+					@NotNull var ioWorldChunkSection = ioWorldChunkSectionArray[chunkSectionIndex];
+					if (ioWorldChunkSection.isEmpty()) {
+						continue;
+					}
 
-			@NotNull var protoChunkPalettedContainerData = protoChunk.getSectionArray()[chunkSectionIndex].getBlockStateContainer().data;
-			@NotNull var protoChunkPaletteStorage = protoChunkPalettedContainerData.storage();
-			@NotNull var ioWorldChunkPalettedContainerData = ioWorldChunkSection.getBlockStateContainer().data;
-			@NotNull var ioWorldChunkPaletteStorage = ioWorldChunkPalettedContainerData.storage();
-			var ioWorldChunkPaletteStorageSize = ioWorldChunkPaletteStorage.getSize();
-			if (protoChunkPaletteStorage.getData().length == 0) {
-				protoChunkPaletteStorage = new PackedIntegerArray(
-						ioWorldChunkPaletteStorage.getElementBits(), ioWorldChunkPaletteStorageSize);
-			}
+					@NotNull var protoChunkPalettedContainerData = protoChunk.getSectionArray()[chunkSectionIndex].getBlockStateContainer().data;
+					@NotNull var protoChunkPaletteStorage = protoChunkPalettedContainerData.storage();
+					@NotNull var ioWorldChunkPalettedContainerData = ioWorldChunkSection.getBlockStateContainer().data;
+					@NotNull var ioWorldChunkPaletteStorage = ioWorldChunkPalettedContainerData.storage();
+					var ioWorldChunkPaletteStorageSize = ioWorldChunkPaletteStorage.getSize();
+					if (protoChunkPaletteStorage.getData().length == 0) {
+						protoChunkPaletteStorage = new PackedIntegerArray(
+								ioWorldChunkPaletteStorage.getElementBits(), ioWorldChunkPaletteStorageSize);
+					}
 
-			for (int blockIndex = 0; blockIndex < ioWorldChunkPaletteStorageSize; blockIndex++) {
-				@NotNull var blockState = ioWorldChunkPalettedContainerData.palette().get(ioWorldChunkPaletteStorage.get(blockIndex));
-				var blockStatePaletteValue = protoChunkPalettedContainerData.palette.index(blockState);
-				if (blockState.equals(Blocks.AIR.getDefaultState()) || blockStatePaletteValue > ((PackedIntegerArrayAccessor) protoChunkPaletteStorage).getMaxValue()) {
-					continue;
+					for (int blockIndex = 0; blockIndex < ioWorldChunkPaletteStorageSize; blockIndex++) {
+						@NotNull var blockState = ioWorldChunkPalettedContainerData.palette().get(ioWorldChunkPaletteStorage.get(blockIndex));
+						var blockStatePaletteValue = protoChunkPalettedContainerData.palette.index(blockState);
+						if (blockState.equals(Blocks.AIR.getDefaultState())
+								|| blockStatePaletteValue > ((PackedIntegerArrayAccessor) protoChunkPaletteStorage).getMaxValue()) {
+							continue;
+						}
+
+						protoChunkPaletteStorage.set(blockIndex, blockStatePaletteValue);
+					}
 				}
-
-				protoChunkPaletteStorage.set(blockIndex, blockStatePaletteValue);
 			}
 		}
-
-		ioWorldChunkRemoveFunction.apply(chunkPos);
+		ioWorldChunksRemoveConsumer.accept(chunkPos);
 
 		protoChunk.setStatus(ChunkStatus.INITIALIZE_LIGHT);
 		protoChunk.refreshSurfaceY();
