@@ -24,15 +24,15 @@ public abstract class WorldMixin {
 	public abstract boolean isClient();
 
 	@Inject(method = "getChunk(IILnet/minecraft/world/chunk/ChunkStatus;Z)Lnet/minecraft/world/chunk/Chunk;", at = @At(value = "HEAD"), cancellable = true)
-	private void noisium$getChunkFromNoisiumServerChunkManager(int chunkX, int chunkZ, @NotNull ChunkStatus leastStatus, boolean create, @NotNull CallbackInfoReturnable<Chunk> cir) {
+	private void noisium$getChunkFromNoisiumServerChunkManager(int chunkPositionX, int chunkPositionZ, @NotNull ChunkStatus leastStatus, boolean create, @NotNull CallbackInfoReturnable<Chunk> cir) {
 		if (this.isClient()) {
 			return;
 		}
 
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this).noisium$getServerWorldChunkManager();
-		var chunkPosition = new ChunkPos(chunkX, chunkZ);
+		var chunkPosition = new ChunkPos(chunkPositionX, chunkPositionZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(new IoWorldChunk((World) (Object) this, chunkPosition));
+			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
 			return;
 		}
 
@@ -48,7 +48,7 @@ public abstract class WorldMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(blockPosition);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(Blocks.BARRIER.getDefaultState());
+			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition).getBlockState(blockPosition));
 			return;
 		}
 
@@ -64,7 +64,7 @@ public abstract class WorldMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(blockPosition);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(Fluids.EMPTY.getDefaultState());
+			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition).getFluidState(blockPosition));
 			return;
 		}
 

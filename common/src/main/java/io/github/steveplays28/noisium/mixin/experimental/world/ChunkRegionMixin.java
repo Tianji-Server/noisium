@@ -1,10 +1,9 @@
 package io.github.steveplays28.noisium.mixin.experimental.world;
 
-import io.github.steveplays28.noisium.experimental.world.chunk.IoWorldChunk;
+import io.github.steveplays28.noisium.experimental.extension.world.server.NoisiumServerWorldExtension;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.fluid.FluidState;
-import net.minecraft.fluid.Fluids;
 import net.minecraft.registry.DynamicRegistryManager;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -50,7 +49,7 @@ public abstract class ChunkRegionMixin implements StructureWorldAccess {
 
 	@Shadow
 	@Final
-	private ServerWorld world;
+	private @NotNull ServerWorld world;
 
 	@Inject(method = "needsBlending", at = @At(value = "HEAD"), cancellable = true)
 	private void noisium$cancelBlending(@NotNull ChunkPos chunkPosition, int checkRadius, @NotNull CallbackInfoReturnable<Boolean> cir) {
@@ -59,9 +58,10 @@ public abstract class ChunkRegionMixin implements StructureWorldAccess {
 	}
 
 	@Inject(method = "getChunk(IILnet/minecraft/world/chunk/ChunkStatus;Z)Lnet/minecraft/world/chunk/Chunk;", at = @At(value = "HEAD"), cancellable = true)
-	private void noisium$getChunkReturnIoChunkIfChunkIsUnloaded(int chunkPositionX, int chunkPositionZ, @NotNull ChunkStatus leastStatus, boolean create, @NotNull CallbackInfoReturnable<Chunk> cir) {
+	private void noisium$getIoWorldChunkIfChunkIsUnloaded(int chunkPositionX, int chunkPositionZ, @NotNull ChunkStatus leastStatus, boolean create, @NotNull CallbackInfoReturnable<Chunk> cir) {
 		if (!this.isChunkLoaded(chunkPositionX, chunkPositionZ)) {
-			cir.setReturnValue(new IoWorldChunk(this.world, new ChunkPos(chunkPositionX, chunkPositionZ)));
+			cir.setReturnValue(((NoisiumServerWorldExtension) this.world).noisium$getServerWorldChunkManager().getIoWorldChunk(
+					new ChunkPos(chunkPositionX, chunkPositionZ)));
 			return;
 		}
 
@@ -69,31 +69,37 @@ public abstract class ChunkRegionMixin implements StructureWorldAccess {
 	}
 
 	@Inject(method = "getBlockState", at = @At(value = "HEAD"), cancellable = true)
-	private void noisium$returnAirBlockStateIfChunkIsUnloaded(@NotNull BlockPos blockPos, @NotNull CallbackInfoReturnable<BlockState> cir) {
+	private void noisium$getBlockStateFromIoWorldChunkIfChunkIsUnloaded(@NotNull BlockPos blockPos, @NotNull CallbackInfoReturnable<BlockState> cir) {
 		if (!this.isChunkLoaded(ChunkSectionPos.getSectionCoord(blockPos.getX()), ChunkSectionPos.getSectionCoord(blockPos.getZ()))) {
 			cir.setReturnValue(Blocks.AIR.getDefaultState());
 		}
 	}
 
 	@Inject(method = "setBlockState", at = @At(value = "HEAD"), cancellable = true)
-	private void noisium$setBlockStateToSaveDataIfChunkIsUnloaded(@NotNull BlockPos blockPos, @NotNull BlockState blockState, int flags, int maxUpdateDepth, @NotNull CallbackInfoReturnable<Boolean> cir) {
+	private void noisium$setBlockStateToIoWorldChunkIfChunkIsUnloaded(@NotNull BlockPos blockPos, @NotNull BlockState blockState, int flags, int maxUpdateDepth, @NotNull CallbackInfoReturnable<Boolean> cir) {
 		if (!this.isChunkLoaded(ChunkSectionPos.getSectionCoord(blockPos.getX()), ChunkSectionPos.getSectionCoord(blockPos.getZ()))) {
-			// TODO: Set blockstate in save data
+			((NoisiumServerWorldExtension) this.world).noisium$getServerWorldChunkManager().getIoWorldChunk(
+					new ChunkPos(blockPos)).setBlockState(blockPos, blockState, false);
 			cir.setReturnValue(true);
 		}
 	}
 
 	@Inject(method = "getFluidState", at = @At(value = "HEAD"), cancellable = true)
-	private void noisium$returnEmptyFluidStateIfChunkIsUnloaded(@NotNull BlockPos blockPos, @NotNull CallbackInfoReturnable<FluidState> cir) {
+	private void noisium$getFluidStateFromIoWorldChunkIfChunkIsUnloaded(@NotNull BlockPos blockPos, @NotNull CallbackInfoReturnable<FluidState> cir) {
 		if (!this.isChunkLoaded(ChunkSectionPos.getSectionCoord(blockPos.getX()), ChunkSectionPos.getSectionCoord(blockPos.getZ()))) {
-			cir.setReturnValue(Fluids.EMPTY.getDefaultState());
+			cir.setReturnValue(((NoisiumServerWorldExtension) this.world).noisium$getServerWorldChunkManager().getIoWorldChunk(
+					new ChunkPos(blockPos)).getFluidState(blockPos));
 		}
 	}
 
 	@Inject(method = "getTopY", at = @At(value = "HEAD"), cancellable = true)
-	private void noisium$getTopYReturnSeaLevelIfChunkIsUnloaded(@NotNull Heightmap.Type heightmap, int blockPositionX, int blockPositionZ, @NotNull CallbackInfoReturnable<Integer> cir) {
+	private void noisium$getTopYFromIoWorldChunkIfChunkIsUnloaded(@NotNull Heightmap.Type heightmap, int blockPositionX, int blockPositionZ, @NotNull CallbackInfoReturnable<Integer> cir) {
 		if (!this.isChunkLoaded(ChunkSectionPos.getSectionCoord(blockPositionX), ChunkSectionPos.getSectionCoord(blockPositionZ))) {
-			cir.setReturnValue(this.getSeaLevel());
+			cir.setReturnValue(((NoisiumServerWorldExtension) this.world).noisium$getServerWorldChunkManager().getIoWorldChunk(
+					new ChunkPos(
+							ChunkSectionPos.getSectionCoord(blockPositionX),
+							ChunkSectionPos.getSectionCoord(blockPositionZ)
+					)).getTopY());
 		}
 	}
 }

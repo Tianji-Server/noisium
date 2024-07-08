@@ -11,6 +11,7 @@
     "NoiseChunkGeneratorMixin",
     "compat.lithium.LithiumNoiseChunkGeneratorMixin",
     "experimental.accessor.server.network.SpawnLocatingAccessor",
+    "experimental.accessor.util.collection.PackedIntegerArrayAccessor",
     "experimental.accessor.world.gen.chunk.ChunkGeneratorAccessor",
     "experimental.block.LichenGrowerGrowCheckerMixin",
     "experimental.compat.distanthorizons.common.wrappers.world.gen.DHBatchGenerationEnvironmentMixin",

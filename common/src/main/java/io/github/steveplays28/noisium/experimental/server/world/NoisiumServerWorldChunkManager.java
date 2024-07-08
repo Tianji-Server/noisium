@@ -8,14 +8,18 @@ import io.github.steveplays28.noisium.Noisium;
 import io.github.steveplays28.noisium.experimental.extension.world.chunk.NoisiumWorldChunkExtension;
 import io.github.steveplays28.noisium.experimental.server.world.chunk.event.NoisiumServerChunkEvent;
 import io.github.steveplays28.noisium.experimental.util.world.chunk.ChunkUtil;
+import io.github.steveplays28.noisium.experimental.world.chunk.IoWorldChunk;
+import io.github.steveplays28.noisium.mixin.experimental.accessor.util.collection.PackedIntegerArrayAccessor;
 import io.github.steveplays28.noisium.mixin.experimental.accessor.world.gen.chunk.ChunkGeneratorAccessor;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.entity.EntityType;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.world.ServerLightingProvider;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.collection.PackedIntegerArray;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -37,6 +41,7 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Function;
 
 import static io.github.steveplays28.noisium.Noisium.MOD_NAME;
 
@@ -48,7 +53,6 @@ import static io.github.steveplays28.noisium.Noisium.MOD_NAME;
 //  The check needs to be changed to point to the server world's isChunkLoaded() method
 // TODO: Implement chunk ticking
 // TODO: Save all chunks when save event is called
-// TODO: Make SerializingRegionBasedStorage#loadedElements thread-safe
 public class NoisiumServerWorldChunkManager {
 	private final ServerWorld serverWorld;
 	private final ChunkGenerator chunkGenerator;
@@ -60,6 +64,7 @@ public class NoisiumServerWorldChunkManager {
 	private final Executor noisePopulationThreadPoolExecutor;
 	private final Executor lightingThreadPoolExecutor;
 	private final ConcurrentMap<ChunkPos, CompletableFuture<WorldChunk>> loadingWorldChunks;
+	private final ConcurrentMap<ChunkPos, IoWorldChunk> ioWorldChunks;
 	private final Map<ChunkPos, WorldChunk> loadedWorldChunks;
 
 	private boolean isStopping;
@@ -86,6 +91,7 @@ public class NoisiumServerWorldChunkManager {
 				2, new ThreadFactoryBuilder().setNameFormat(
 						"Noisium Server World Chunk Manager Lighting " + serverWorld.getDimension().effects() + " %d").build());
 		this.loadingWorldChunks = new ConcurrentHashMap<>();
+		this.ioWorldChunks = new ConcurrentHashMap<>();
 		this.loadedWorldChunks = new HashMap<>();
 
 		NoisiumServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
@@ -134,7 +140,7 @@ public class NoisiumServerWorldChunkManager {
 			var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 			if (fetchedNbtData == null) {
 				// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
-				return new WorldChunk(serverWorld, generateChunk(chunkPos), null);
+				return new WorldChunk(serverWorld, generateChunk(chunkPos, this::getIoWorldChunk, ioWorldChunks::remove), null);
 			}
 
 			versionedChunkStorage.updateChunkNbt(
@@ -168,7 +174,7 @@ public class NoisiumServerWorldChunkManager {
 	 * @param chunkPos The position at which to load the {@link WorldChunk}.
 	 * @return The loaded {@link WorldChunk}.
 	 */
-	public @NotNull WorldChunk getChunk(ChunkPos chunkPos) {
+	public @NotNull WorldChunk getChunk(@NotNull ChunkPos chunkPos) {
 		if (isStopping) {
 			throw new IllegalStateException(String.format("Can't get chunk because %s Server World Chunk Manager is stopping.", MOD_NAME));
 		}
@@ -182,7 +188,8 @@ public class NoisiumServerWorldChunkManager {
 		var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 		if (fetchedNbtData == null) {
 			// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
-			var fetchedWorldChunk = new WorldChunk(serverWorld, generateChunk(chunkPos), null);
+			var fetchedWorldChunk = new WorldChunk(
+					serverWorld, generateChunk(chunkPos, this::getIoWorldChunk, ioWorldChunks::remove), null);
 			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 			NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 			return fetchedWorldChunk;
@@ -197,6 +204,16 @@ public class NoisiumServerWorldChunkManager {
 		loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 		NoisiumServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 		return fetchedWorldChunk;
+	}
+
+	public @NotNull IoWorldChunk getIoWorldChunk(@NotNull ChunkPos chunkPos) {
+		if (ioWorldChunks.containsKey(chunkPos)) {
+			return ioWorldChunks.get(chunkPos);
+		}
+
+		@NotNull var ioWorldChunk = new IoWorldChunk(serverWorld, chunkPos);
+		ioWorldChunks.put(chunkPos, ioWorldChunk);
+		return ioWorldChunk;
 	}
 
 	/**
@@ -332,7 +349,8 @@ public class NoisiumServerWorldChunkManager {
 	}
 
 	// TODO: Move this into the constructor as a Supplier<ChunkPos, ProtoChunk>
-	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos) {
+	@SuppressWarnings("ForLoopReplaceableByForEach")
+	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkGetFunction, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkRemoveFunction) {
 		var serverLightingProvider = (ServerLightingProvider) serverWorld.getLightingProvider();
 		var protoChunk = new ProtoChunk(chunkPos, UpgradeData.NO_UPGRADE_DATA, serverWorld,
 				serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null
@@ -384,6 +402,36 @@ public class NoisiumServerWorldChunkManager {
 		);
 		chunkGenerator.generateFeatures(chunkRegion, protoChunk, chunkRegionStructureAccessor);
 		Blender.tickLeavesAndFluids(chunkRegion, protoChunk);
+
+		@NotNull var ioWorldChunkSectionArray = ioWorldChunkGetFunction.apply(chunkPos).getSectionArray();
+		for (int chunkSectionIndex = 0; chunkSectionIndex < ioWorldChunkSectionArray.length; chunkSectionIndex++) {
+			@NotNull var ioWorldChunkSection = ioWorldChunkSectionArray[chunkSectionIndex];
+			if (ioWorldChunkSection.isEmpty()) {
+				continue;
+			}
+
+			@NotNull var protoChunkPalettedContainerData = protoChunk.getSectionArray()[chunkSectionIndex].getBlockStateContainer().data;
+			@NotNull var protoChunkPaletteStorage = protoChunkPalettedContainerData.storage();
+			@NotNull var ioWorldChunkPalettedContainerData = ioWorldChunkSection.getBlockStateContainer().data;
+			@NotNull var ioWorldChunkPaletteStorage = ioWorldChunkPalettedContainerData.storage();
+			var ioWorldChunkPaletteStorageSize = ioWorldChunkPaletteStorage.getSize();
+			if (protoChunkPaletteStorage.getData().length == 0) {
+				protoChunkPaletteStorage = new PackedIntegerArray(
+						ioWorldChunkPaletteStorage.getElementBits(), ioWorldChunkPaletteStorageSize);
+			}
+
+			for (int blockIndex = 0; blockIndex < ioWorldChunkPaletteStorageSize; blockIndex++) {
+				@NotNull var blockState = ioWorldChunkPalettedContainerData.palette().get(ioWorldChunkPaletteStorage.get(blockIndex));
+				var blockStatePaletteValue = protoChunkPalettedContainerData.palette.index(blockState);
+				if (blockState.equals(Blocks.AIR.getDefaultState()) || blockStatePaletteValue > ((PackedIntegerArrayAccessor) protoChunkPaletteStorage).getMaxValue()) {
+					continue;
+				}
+
+				protoChunkPaletteStorage.set(blockIndex, blockStatePaletteValue);
+			}
+		}
+
+		ioWorldChunkRemoveFunction.apply(chunkPos);
 
 		protoChunk.setStatus(ChunkStatus.INITIALIZE_LIGHT);
 		protoChunk.refreshSurfaceY();

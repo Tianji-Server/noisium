@@ -99,7 +99,7 @@ public abstract class ServerChunkManagerMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(new IoWorldChunk(this.getWorld(), chunkPosition));
+			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
 			return;
 		}
 
@@ -111,7 +111,7 @@ public abstract class ServerChunkManagerMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(new IoWorldChunk(this.getWorld(), chunkPosition));
+			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
 			return;
 		}
 
@@ -123,7 +123,7 @@ public abstract class ServerChunkManagerMixin {
 		var noisiumServerWorldChunkManager = ((NoisiumServerWorldExtension) this.getWorld()).noisium$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(new IoWorldChunk(this.getWorld(), chunkPosition));
+			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
 			return;
 		}
 

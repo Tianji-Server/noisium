@@ -1,12 +1,7 @@
 package io.github.steveplays28.noisium.experimental.world.chunk;
 
 import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.fluid.Fluid;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.fluid.Fluids;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -20,6 +15,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * A {@link ServerWorld} {@link WorldChunk} with disk (IO) access.
  */
+// TODO: Add disk (IO) access
 public class IoWorldChunk extends WorldChunk {
 	public IoWorldChunk(@NotNull World world, @NotNull ChunkPos chunkPosition) {
 		super(world, chunkPosition);
@@ -41,37 +37,8 @@ public class IoWorldChunk extends WorldChunk {
 	}
 
 	@Override
-	public @NotNull BlockState getBlockState(BlockPos blockPosition) {
-		return Blocks.BARRIER.getDefaultState();
-	}
-
-	@Override
-	public @Nullable BlockState setBlockState(@NotNull BlockPos blockPosition, @Nullable BlockState blockState, boolean moved) {
-		return blockState;
-	}
-
-	@Override
-	public @NotNull FluidState getFluidState(BlockPos blockPosition) {
-		return Fluids.EMPTY.getDefaultState();
-	}
-
-	@Override
-	public void setBlockEntity(BlockEntity blockEntity) {
-
-	}
-
-	@Override
-	public @Nullable BlockEntity getBlockEntity(BlockPos blockPosition) {
-		return null;
-	}
-
-	@Override
 	public @NotNull NbtCompound getPackedBlockEntityNbt(@NotNull BlockPos blockPosition) {
-		return new NbtCompound();
-	}
-
-	@Override
-	public void removeBlockEntity(BlockPos blockPosition) {
-
+		@Nullable var packedBlockEntityNbt = super.getPackedBlockEntityNbt(blockPosition);
+		return packedBlockEntityNbt == null ? new NbtCompound() : packedBlockEntityNbt;
 	}
 }
