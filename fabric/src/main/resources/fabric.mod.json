@@ -30,7 +30,8 @@
     },
     "lithium:options": {
       "world.inline_block_access": false,
-      "gen.chunk_region": false
+      "gen.chunk_region": false,
+      "chunk.no_locking": false
     }
   },
   "environment": "*",
