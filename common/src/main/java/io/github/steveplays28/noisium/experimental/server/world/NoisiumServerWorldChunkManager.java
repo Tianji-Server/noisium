@@ -10,8 +10,6 @@ import io.github.steveplays28.noisium.experimental.server.world.chunk.event.Nois
 import io.github.steveplays28.noisium.experimental.util.world.chunk.ChunkUtil;
 import io.github.steveplays28.noisium.experimental.world.chunk.IoWorldChunk;
 import io.github.steveplays28.noisium.mixin.experimental.accessor.util.collection.PackedIntegerArrayAccessor;
-import io.github.steveplays28.noisium.mixin.experimental.accessor.util.thread.LockHelperAccessor;
-import io.github.steveplays28.noisium.mixin.experimental.accessor.world.chunk.PalettedContainerAccessor;
 import io.github.steveplays28.noisium.mixin.experimental.accessor.world.gen.chunk.ChunkGeneratorAccessor;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -411,14 +409,10 @@ public class NoisiumServerWorldChunkManager {
 			}
 
 			@NotNull var ioWorldChunkSectionBlockStateContainer = ioWorldChunkSection.getBlockStateContainer();
-			@NotNull var ioWorldChunkSectionLockHelper = ((LockHelperAccessor) ((PalettedContainerAccessor) ioWorldChunkSectionBlockStateContainer).getLockHelper());
-			@NotNull var ioWorldChunkSectionLock = ioWorldChunkSectionLockHelper.getLock();
-			ioWorldChunkSectionLock.lock();
+			ioWorldChunkSectionBlockStateContainer.lock();
 
 			@NotNull var protoChunkSectionBlockStateContainer = protoChunk.getSectionArray()[chunkSectionIndex].getBlockStateContainer();
-			@NotNull var protoChunkSectionLockHelper = ((LockHelperAccessor) ((PalettedContainerAccessor) protoChunkSectionBlockStateContainer).getLockHelper());
-			@NotNull var protoChunkSectionLock = protoChunkSectionLockHelper.getLock();
-			protoChunkSectionLock.lock();
+			protoChunkSectionBlockStateContainer.lock();
 
 			@NotNull var protoChunkPalettedContainerData = protoChunkSectionBlockStateContainer.data;
 			@NotNull var protoChunkPaletteStorage = protoChunkPalettedContainerData.storage();
@@ -441,11 +435,8 @@ public class NoisiumServerWorldChunkManager {
 				protoChunkPaletteStorage.set(blockIndex, blockStatePaletteValue);
 			}
 
-
-			ioWorldChunkSectionLockHelper.setThread(null);
-			ioWorldChunkSectionLock.unlock();
-			protoChunkSectionLockHelper.setThread(null);
-			protoChunkSectionLock.unlock();
+			ioWorldChunkSectionBlockStateContainer.unlock();
+			protoChunkSectionBlockStateContainer.unlock();
 		}
 
 		ioWorldChunkRemoveFunction.apply(chunkPos);
