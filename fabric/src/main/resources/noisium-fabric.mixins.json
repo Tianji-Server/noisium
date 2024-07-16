@@ -3,9 +3,9 @@
   "minVersion": "0.8",
   "package": "io.github.steveplays28.noisium.fabric.mixin",
   "compatibilityLevel": "JAVA_17",
-  "plugin": "io.github.steveplays28.noisium.fabric.mixin.compat.fabric.api.networking.v1.NoisiumFabricMixinPlugin",
+  "plugin": "io.github.steveplays28.noisium.fabric.mixin.experimental.compat.fabric.api.networking.v1.NoisiumFabricMixinPlugin",
   "mixins": [
-    "compat.fabric.api.networking.v1.PlayerLookupMixin"
+    "experimental.compat.fabric.api.networking.v1.PlayerLookupMixin"
   ],
   "client": [],
   "injectors": {

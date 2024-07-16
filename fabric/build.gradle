@@ -53,6 +53,10 @@ dependencies {
 processResources {
     inputs.property "version", project.version
 
+    from(project(":common").sourceSets["main"].resources) {
+        include("assets", "data", "resourcepacks")
+    }
+
     filesMatching("fabric.mod.json") {
         expand "version": project.version,
                 "mod_id": rootProject.mod_id,
@@ -64,7 +68,8 @@ processResources {
                 "modrinth_project_id": rootProject.modrinth_project_id,
                 "fabric_loader_version": rootProject.fabric_loader_version,
                 "supported_minecraft_version": rootProject.supported_minecraft_version,
-                "architectury_api_version": rootProject.architectury_api_version
+                "architectury_api_version": rootProject.architectury_api_version,
+                "yet_another_config_lib_version": rootProject.yet_another_config_lib_version
     }
 }
 

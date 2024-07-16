@@ -1,4 +1,4 @@
-package io.github.steveplays28.noisium.fabric.mixin.compat.fabric.api.networking.v1;
+package io.github.steveplays28.noisium.fabric.mixin.experimental.compat.fabric.api.networking.v1;
 
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.minecraft.entity.Entity;

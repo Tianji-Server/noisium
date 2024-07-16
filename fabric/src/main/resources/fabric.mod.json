@@ -50,7 +50,8 @@
   "depends": {
     "fabricloader": ">=${fabric_loader_version}",
     "minecraft": "${supported_minecraft_version}",
-    "architectury": ">=${architectury_api_version}"
+    "architectury": ">=${architectury_api_version}",
+    "yet_another_config_lib_v3": ">=${yet_another_config_lib_version}-fabric"
   },
   "suggests": {
     "c2me": "*"
