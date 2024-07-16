@@ -1,6 +1,6 @@
 package io.github.steveplays28.noisium.compat.lithium;
 
-import io.github.steveplays28.noisium.util.ModUtil;
+import io.github.steveplays28.noisium.util.ModLoaderUtil;
 
 public class NoisiumLithiumCompat {
 	public static final String LITHIUM_MOD_ID = "lithium";
@@ -11,6 +11,6 @@ public class NoisiumLithiumCompat {
 	 * @return If Lithium, or a (Neo)Forge fork, is loaded.
 	 */
 	public static boolean isLithiumLoaded() {
-		return ModUtil.isModPresent(LITHIUM_MOD_ID) || ModUtil.isModPresent(CANARY_MOD_ID) || ModUtil.isModPresent(RADIUM_MOD_ID);
+		return ModLoaderUtil.isModPresent(LITHIUM_MOD_ID) || ModLoaderUtil.isModPresent(CANARY_MOD_ID) || ModLoaderUtil.isModPresent(RADIUM_MOD_ID);
 	}
 }

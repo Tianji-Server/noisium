@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
-import static io.github.steveplays28.noisium.util.ModUtil.isModPresent;
+import static io.github.steveplays28.noisium.util.ModLoaderUtil.isModPresent;
 
 public class NoisiumMixinPlugin implements IMixinConfigPlugin {
 	private static final Supplier<Boolean> TRUE = () -> true;

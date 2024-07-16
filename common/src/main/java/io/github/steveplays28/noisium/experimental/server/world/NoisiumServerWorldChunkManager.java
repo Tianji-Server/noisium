@@ -5,6 +5,7 @@ import com.mojang.datafixers.DataFixer;
 import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.TickEvent;
 import io.github.steveplays28.noisium.Noisium;
+import io.github.steveplays28.noisium.experimental.config.NoisiumConfig;
 import io.github.steveplays28.noisium.experimental.extension.world.chunk.NoisiumWorldChunkExtension;
 import io.github.steveplays28.noisium.experimental.server.world.chunk.event.NoisiumServerChunkEvent;
 import io.github.steveplays28.noisium.experimental.util.world.chunk.ChunkUtil;
@@ -82,13 +83,13 @@ public class NoisiumServerWorldChunkManager {
 				worldDirectoryPath.resolve("poi"), dataFixer, false, serverWorld.getRegistryManager(), serverWorld);
 		this.versionedChunkStorage = new VersionedChunkStorage(worldDirectoryPath.resolve("region"), dataFixer, false);
 		this.threadPoolExecutor = Executors.newFixedThreadPool(
-				4, new ThreadFactoryBuilder().setNameFormat(
+				NoisiumConfig.HANDLER.instance().serverWorldChunkManagerThreads, new ThreadFactoryBuilder().setNameFormat(
 						"Noisium Server World Chunk Manager " + serverWorld.getDimension().effects() + " %d").build());
 		this.noisePopulationThreadPoolExecutor = Executors.newFixedThreadPool(
-				2, new ThreadFactoryBuilder().setNameFormat(
+				NoisiumConfig.HANDLER.instance().serverWorldChunkManagerThreads, new ThreadFactoryBuilder().setNameFormat(
 						"Noisium Server World Chunk Manager Noise Population " + serverWorld.getDimension().effects() + " %d").build());
 		this.lightingThreadPoolExecutor = Executors.newFixedThreadPool(
-				2, new ThreadFactoryBuilder().setNameFormat(
+				NoisiumConfig.HANDLER.instance().serverWorldChunkManagerLightingThreads, new ThreadFactoryBuilder().setNameFormat(
 						"Noisium Server World Chunk Manager Lighting " + serverWorld.getDimension().effects() + " %d").build());
 		this.loadingWorldChunks = new ConcurrentHashMap<>();
 		this.ioWorldChunks = new ConcurrentHashMap<>();
