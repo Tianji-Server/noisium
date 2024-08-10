@@ -6,7 +6,7 @@ Optimises worldgen performance for a better gameplay experience.
 
 In the best case measured so far, the improvements can be up to a 1.25% speedup per thread when generating new chunks in vanilla
 Minecraft.  
-With 4 threads, that means that in total there is a 5% increase in world generation speed.  
+With 4 threads, that means that there is a 5% increase in world generation speed in total.  
 This was benchmarked on an Intel i5-7500, on 1.20.1 Fabric with Chunky, by generating a 2000x2000 block area using `/chunky radius 1000`.  
 Results may vary based on hardware and thread counts (e.x. faster hardware may benefit less).
 
