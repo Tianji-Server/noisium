@@ -4,18 +4,24 @@
 
 Optimises worldgen performance for a better gameplay experience.
 
-The improvements lie between a 20-30% speedup when generating new chunks in vanilla Minecraft (benchmarked on 1.20.1 Fabric).
+In the best case measured so far, the improvements can be up to a 1.25% speedup per thread when generating new chunks in vanilla
+Minecraft.  
+With 4 threads, that means that in total there is a 5% increase in world generation speed.  
+This was benchmarked on an Intel i5-7500, on 1.20.1 Fabric with Chunky, by generating a 2000x2000 block area using `/chunky radius 1000`.  
+Results may vary based on hardware and thread counts (e.x. faster hardware may benefit less).
+
+![5 CPU benchmarks, by Uniter, raccoonman2 and ishland](docs/benchmarks/5_cpu_benchmarks_by_uniter_raccoonman2_and_ishland.png)
 
 Noisium changes some world generation functions that other mods don't touch, to fill in the gaps left by other performance optimisation
 mods.
-Most notably, `NoiseChunkGenerator#populateNoise` is optimised to speed up blockstate placement when generating new chunks. There are also 3
-other smaller optimisations, that increase biome population speed, chunk unlocking speed, and the speed of sampling blockstates for
-generation.  
-In `NoiseChunkGenerator#populateNoise`, setting the blockstate via abstractions/built-in functions is bypassed. Instead, the blocks are set
-directly in the palette storage, thus bypassing a lot of calculations and things Minecraft does that are normally useful when blocks are
-set, but when generating the world only slow it down, this is a cycle optimisation.
+Most notably, `NoiseChunkGenerator#populateNoise` is optimised to speed up block state placement when generating new chunks.  
+Setting the block state via abstractions/built-in functions is bypassed. Instead, the block states are set directly in the palette storage,
+thus bypassing calculations Minecraft does that are normally useful when block states are set, but when generating the world only slow it
+down. This is a cycle optimisation.  
+There are also 3 other optimisations, that increase biome population speed, block state sampling speed and chunk unlocking speed (Minecraft
+1.21 and up) during world generation.
 
-Noisium has full 1:1 parity with vanilla worldgen (worldgen without Noisium).
+Noisium has full 1:1 parity with vanilla Minecraft world generation (world generation without Noisium).
 
 ## Dependencies
 
@@ -54,8 +60,8 @@ a list of incompatibilities.
 ![NeoForge](docs/assets/badges/compact/supported/neoforge_vector.svg)
 
 See the version info in the filename for the supported Minecraft versions.  
-Made for the Fabric, Quilt, Forge, and NeoForge modloaders. The `merged` JAR works on all aforementioned modloaders.  
-Server side.
+Made for the Fabric, Quilt, Forge, and NeoForge modloaders.  
+Server-side.
 
 ## FAQ
 
@@ -70,7 +76,9 @@ Server side.
 
 ## Attribution
 
-- Thanks to [Builderb0y](https://modrinth.com/user/Builderb0y) for giving great starting points and helping with some issues.
+- Thank you to [Builderb0y](https://modrinth.com/user/Builderb0y) for giving great starting points and helping with issues
+- Thank you to [ishland](https://github.com/ishland) for helping with C2ME compatibility and benchmarking performance
+- Thank you to [Uniter](https://github.com/Uniter343) and [raccoonman2](https://github.com/racoonman2) for benchmarking performance
 
 ## License
 
